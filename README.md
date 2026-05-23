@@ -24,16 +24,16 @@ pi install /path/to/pi-git
 
 ## Commands
 
-### `/git-auto-commit`
+### `/git-agg-commit`
 
 Automatically analyzes the working tree diff, splits changes into logical hunks, generates [Conventional Commits](https://www.conventionalcommits.org/) style messages, stages files, and creates commits — all in one shot.
 
 #### Usage
 
 ```
-/git-auto-commit
-/git-auto-commit --lang=ja
-/git-auto-commit --language=en
+/git-agg-commit
+/git-agg-commit --lang=ja
+/git-agg-commit --language=en
 ```
 
 #### Options
@@ -54,10 +54,10 @@ Automatically analyzes the working tree diff, splits changes into logical hunks,
 
 ```bash
 # Stage all changes and create logically split commits with English messages
-/git-auto-commit
+/git-agg-commit
 
 # Use Japanese for both status messages and commit messages
-/git-auto-commit --lang=ja
+/git-agg-commit --lang=ja
 ```
 
 #### Generated commit message format
@@ -95,7 +95,7 @@ The language setting is saved to `~/.config/pi-git/settings.json` and reused acr
 | AI model unavailable / auth fails | Falls back to file-per-hunk splitting |
 | Untracked files | Included in diff analysis and committed |
 | User edits files during execution | Safe: diff is snapshotted at the start via `git stash` so analysis is not affected by concurrent edits |
-| `/git-auto-commit` run while another is already in progress | Blocked with a warning; prevents staging area conflicts between concurrent executions |
+| `/git-agg-commit` run while another is already in progress | Blocked with a warning; prevents staging area conflicts between concurrent executions |
 
 #### Status display
 
