@@ -9,7 +9,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { completeSimple } from "@earendil-works/pi-ai";
 import type { Context } from "@earendil-works/pi-ai";
 import type { Hunk } from "../types.js";
-import { getCommitMessageLanguage } from "../utils/settings.js";
+import { getLanguage } from "../utils/settings.js";
 
 function getSystemPrompt(lang: string): string {
 	const isJapanese = lang === "ja" || lang === "ja-JP" || lang === "japanese";
@@ -146,7 +146,7 @@ export async function analyzeDiff(
 	}
 
 	try {
-		const lang = getCommitMessageLanguage();
+		const lang = getLanguage();
 		const context: Context = {
 			systemPrompt: getSystemPrompt(lang),
 			messages: [

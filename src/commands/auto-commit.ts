@@ -15,7 +15,7 @@ import {
 } from "../core/git.js";
 import { analyzeDiff } from "../core/diff-analyzer.js";
 import { sanitizeHunk } from "../core/commit-message.js";
-import { setCommitMessageLanguage, getCommitMessageLanguage } from "../utils/settings.js";
+import { setLanguage, getLanguage } from "../utils/settings.js";
 
 const STATUS_ID = "pi-git-auto-commit";
 
@@ -52,11 +52,11 @@ export async function handleAutoCommit(
 	// Parse language argument
 	const langArg = parseLangArg(args);
 	if (langArg) {
-		setCommitMessageLanguage(langArg);
-		ctx.ui.notify(`Commit message language set to: ${langArg}`, "info");
+		setLanguage(langArg);
+		ctx.ui.notify(`Language set to: ${langArg}`, "info");
 	}
 
-	const lang = getCommitMessageLanguage();
+	const lang = getLanguage();
 
 	// 1. Skip in non-interactive mode
 	if (!ctx.hasUI) {
@@ -158,9 +158,8 @@ export async function handleAutoCommit(
 	// 8. Notify completion
 	ctx.ui.setStatus(STATUS_ID, "");
 	if (committedCount > 0 && failedCount === 0) {
-		const currentLang = getCommitMessageLanguage();
 		ctx.ui.notify(
-			`Created ${committedCount} commit${committedCount > 1 ? "s" : ""} (language: ${currentLang})`,
+			`Created ${committedCount} commit${committedCount > 1 ? "s" : ""}`,
 			"info",
 		);
 	} else if (committedCount > 0 && failedCount > 0) {

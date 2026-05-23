@@ -9,15 +9,15 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 export interface PiGitSettings {
-	/** Commit message language (e.g., "en", "ja") */
-	commitMessageLanguage?: string;
+	/** Display and commit message language (e.g., "en", "ja") */
+	lang?: string;
 }
 
 const CONFIG_DIR = join(homedir(), ".config", "pi-git");
 const SETTINGS_FILE = join(CONFIG_DIR, "settings.json");
 
 const DEFAULT_SETTINGS: PiGitSettings = {
-	commitMessageLanguage: "en",
+	lang: "en",
 };
 
 function loadSettingsFromDisk(): PiGitSettings {
@@ -54,10 +54,10 @@ export function saveSettings(settings: Partial<PiGitSettings>): void {
 	cachedSettings = updated;
 }
 
-export function getCommitMessageLanguage(): string {
-	return getSettings().commitMessageLanguage || "en";
+export function getLanguage(): string {
+	return getSettings().lang || "en";
 }
 
-export function setCommitMessageLanguage(lang: string): void {
-	saveSettings({ commitMessageLanguage: lang });
+export function setLanguage(lang: string): void {
+	saveSettings({ lang });
 }
