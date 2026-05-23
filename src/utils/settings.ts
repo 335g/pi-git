@@ -25,6 +25,37 @@ export interface PiGitSettings {
 
 export type SettingOrigin = "default" | "global" | "local";
 
+/** Metadata for each valid configuration key */
+export interface KeyMeta {
+	key: string;
+	/** Display type (e.g., "string", "boolean") */
+	type: string;
+	/** Japanese description */
+	description_ja: string;
+	/** English description */
+	description_en: string;
+	/** Valid values hint (optional) */
+	valid_values?: string;
+}
+
+/** Metadata for all valid configuration keys */
+export const VALID_KEYS_META: KeyMeta[] = [
+	{
+		key: "lang",
+		type: "string",
+		description_ja: "表示・コミットメッセージの言語設定",
+		description_en: "Display and commit message language",
+		valid_values: '"en" or "ja"',
+	},
+	{
+		key: "auto_agg_commit",
+		type: "boolean",
+		description_ja: "アシスタント応答後の自動コミット有無",
+		description_en: "Whether to automatically run git-agg-commit after assistant response",
+		valid_values: "true or false",
+	},
+];
+
 export const DEFAULT_SETTINGS: PiGitSettings = {
 	lang: "en",
 	auto_agg_commit: false,

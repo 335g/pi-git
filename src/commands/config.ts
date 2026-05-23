@@ -19,6 +19,7 @@ import {
 	getLocalSettingsPath,
 	DEFAULT_SETTINGS,
 	GLOBAL_SETTINGS_FILE,
+	VALID_KEYS_META,
 } from "../utils/settings.js";
 
 function isJapanese(lang: string): boolean {
@@ -86,7 +87,15 @@ export async function handleConfig(
 	}
 
 	if (keys) {
-		ctx.ui.notify(VALID_KEYS.join("\n"), "info");
+		const lines = VALID_KEYS_META.map((meta) => {
+			const desc = ja ? meta.description_ja : meta.description_en;
+			let line = `${meta.key} (${meta.type}) — ${desc}`;
+			if (meta.valid_values) {
+				line += ` [${meta.valid_values}]`;
+			}
+			return line;
+		});
+		ctx.ui.notify(lines.join("\n"), "info");
 		return;
 	}
 
