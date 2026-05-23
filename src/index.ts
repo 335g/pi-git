@@ -5,11 +5,12 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { handleAggCommit, isAggCommitRunning } from "./commands/agg-commit.js";
+import { handleAggCommit, isAggCommitRunning, setAggCommitRunning } from "./commands/agg-commit.js";
 import { handleAutoAggCommit } from "./commands/auto-agg-commit.js";
 import { handleConfig } from "./commands/config.js";
-import { isGitRepository, hasChanges } from "./core/git.js";
-import { getAutoAggCommit } from "./utils/settings.js";
+import { isGitRepository, hasChanges, stageFiles, resetStaging } from "./core/git.js";
+import { generateAutoCommitMessage } from "./core/auto-commit-message.js";
+import { getAutoAggCommit, getLanguage } from "./utils/settings.js";
 import { updateAutoAggCommitStatus } from "./utils/status.js";
 
 export default function (pi: ExtensionAPI) {
@@ -45,7 +46,7 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	// Auto-run git-agg-commit after assistant response when enabled
-	pi.on("agent_end", async (_event, ctx) => {
+	pi.on("agent_end", async (event, ctx) => {
 		if (!ctx.hasUI) {
 			return;
 		}
@@ -66,6 +67,67 @@ export default function (pi: ExtensionAPI) {
 			return;
 		}
 
-		await handleAggCommit(pi, ctx, "");
+		// 自動実行モード: hunk解析をスキップし、会話履歴からコミットメッセージを生成
+		setAggCommitRunning(true);
+		try {
+			// 変更ファイル一覧を取得
+			const { stdout: statusOutput } = await pi.exec(
+				"git",
+				["status", "--short"],
+				{ cwd: ctx.cwd },
+			);
+			const changedFiles = statusOutput
+				.split("\n")
+				.filter(Boolean)
+				.map((line) => line.slice(3).trim())
+				.filter(Boolean);
+
+			if (changedFiles.length === 0) {
+				return;
+			}
+
+			// 会話履歴からコミットメッセージを生成
+			const messages = ((event as any).messages || []) as {
+				role: string;
+				content: unknown;
+			}[];
+			const commitMessage = await generateAutoCommitMessage(
+				pi,
+				ctx,
+				messages,
+				changedFiles,
+			);
+
+			// 全ファイルをステージングして1つのコミット
+			await stageFiles(pi, changedFiles, ctx.cwd);
+			const { code: exitCode, stderr } = await pi.exec(
+				"git",
+				["commit", "-m", commitMessage],
+				{ cwd: ctx.cwd },
+			);
+
+			const lang = getLanguage(ctx.cwd);
+			const isJapanese =
+				lang === "ja" || lang === "ja-JP" || lang === "japanese";
+
+			if (exitCode !== 0) {
+				await resetStaging(pi, ctx.cwd);
+				ctx.ui.notify(
+					isJapanese
+						? `コミットに失敗しました: ${stderr}`
+						: `Commit failed: ${stderr}`,
+					"warning",
+				);
+			} else {
+				ctx.ui.notify(
+					isJapanese
+						? `コミットを作成しました: ${commitMessage}`
+						: `Created commit: ${commitMessage}`,
+					"info",
+				);
+			}
+		} finally {
+			setAggCommitRunning(false);
+		}
 	});
 }
