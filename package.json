@@ -2,12 +2,19 @@
   "name": "pi-git",
   "version": "1.0.0",
   "description": "Git utilities extension for pi-coding-agent",
-  "keywords": ["pi-package"],
+  "keywords": [
+    "pi-package"
+  ],
   "author": "Yoshiki Kudo",
   "license": "MIT",
   "main": "./src/index.ts",
   "pi": {
-    "extensions": ["./src/index.ts"]
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
