@@ -10,7 +10,6 @@ import {
 	isGitRepository,
 	hasChanges,
 	stageFiles,
-	commit,
 	resetStaging,
 } from "../core/git.js";
 import { analyzeDiff } from "../core/diff-analyzer.js";
@@ -143,10 +142,24 @@ export async function handleAggCommit(
 	ctx.ui.setStatus(STATUS_ID, statusText(lang, "generateMessage", autoCommit));
 	hunks = hunks.map(sanitizeHunk);
 
+	// Deduplicate files across hunks: each file belongs only to its first hunk
+	const seenFiles = new Set<string>();
+	hunks = hunks
+		.map((hunk) => ({
+			...hunk,
+			files: hunk.files.filter((f) => {
+				if (seenFiles.has(f)) return false;
+				seenFiles.add(f);
+				return true;
+			}),
+		}))
+		.filter((hunk) => hunk.files.length > 0);
+
 	// 7. Stage and commit each hunk
 	ctx.ui.setStatus(STATUS_ID, statusText(lang, "commit", autoCommit));
 	let committedCount = 0;
 	let failedCount = 0;
+	let skippedCount = 0;
 
 	for (const hunk of hunks) {
 		// Stage files for this hunk
@@ -157,8 +170,16 @@ export async function handleAggCommit(
 			continue;
 		}
 
+		// Check if there are any staged changes before committing
+		const { stdout: stagedDiff, code: diffCode } = await pi.exec("git", ["diff", "--cached", "--stat"], { cwd: ctx.cwd });
+		if (diffCode !== 0 || !stagedDiff.trim()) {
+			// This file was already committed by a previous hunk
+			skippedCount++;
+			continue;
+		}
+
 		// Commit
-		const exitCode = await commit(pi, hunk.message, ctx.cwd);
+		const { code: exitCode, stderr } = await pi.exec("git", ["commit", "-m", hunk.message], { cwd: ctx.cwd });
 		if (exitCode !== 0) {
 			// Pre-commit hook failed or other error - reset staging
 			try {
@@ -166,8 +187,9 @@ export async function handleAggCommit(
 			} catch {
 				// Ignore reset errors
 			}
+			const detail = stderr.trim() ? ` — ${stderr.trim()}` : "";
 			ctx.ui.notify(
-				`Commit failed for "${hunk.message}" (exit code ${exitCode}). Staging has been reset.`,
+				`Commit failed for "${hunk.message}" (exit code ${exitCode}).${detail} Staging has been reset.`,
 				"warning",
 			);
 			failedCount++;
@@ -179,18 +201,17 @@ export async function handleAggCommit(
 
 		// 8. Notify completion
 		ctx.ui.setStatus(STATUS_ID, "");
-		if (committedCount > 0 && failedCount === 0) {
-			ctx.ui.notify(
-				`Created ${committedCount} commit${committedCount > 1 ? "s" : ""}`,
-				"info",
-			);
-		} else if (committedCount > 0 && failedCount > 0) {
-			ctx.ui.notify(
-				`Created ${committedCount} commit${committedCount > 1 ? "s" : ""}, ${failedCount} failed`,
-				"warning",
-			);
-		} else {
+		const parts: string[] = [];
+		if (committedCount > 0) parts.push(`Created ${committedCount} commit${committedCount > 1 ? "s" : ""}`);
+		if (skippedCount > 0) parts.push(`${skippedCount} skipped`);
+		if (failedCount > 0) parts.push(`${failedCount} failed`);
+
+		if (parts.length === 0) {
 			ctx.ui.notify("All commits failed", "error");
+		} else if (failedCount > 0) {
+			ctx.ui.notify(parts.join(", "), "warning");
+		} else {
+			ctx.ui.notify(parts.join(", "), "info");
 		}
 	} finally {
 		isAggCommitRunning = false;
