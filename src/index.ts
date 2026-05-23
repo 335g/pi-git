@@ -67,8 +67,19 @@ export default function (pi: ExtensionAPI) {
 			return;
 		}
 
+		const STATUS_ID = "pi-git-agg-commit";
+		const lang = getLanguage(ctx.cwd);
+		const isJapanese =
+			lang === "ja" || lang === "ja-JP" || lang === "japanese";
+
 		// 自動実行モード: hunk解析をスキップし、会話履歴からコミットメッセージを生成
 		setAggCommitRunning(true);
+		ctx.ui.setStatus(
+			STATUS_ID,
+			isJapanese
+				? "[pi-git: auto-commit] コミットメッセージ生成中..."
+				: "[pi-git: auto-commit] Generating commit message...",
+		);
 		try {
 			// 変更ファイル一覧を取得
 			const { stdout: statusOutput } = await pi.exec(
@@ -83,6 +94,7 @@ export default function (pi: ExtensionAPI) {
 				.filter(Boolean);
 
 			if (changedFiles.length === 0) {
+				ctx.ui.setStatus(STATUS_ID, "");
 				return;
 			}
 
@@ -98,6 +110,13 @@ export default function (pi: ExtensionAPI) {
 				changedFiles,
 			);
 
+			ctx.ui.setStatus(
+				STATUS_ID,
+				isJapanese
+					? "[pi-git: auto-commit] コミット実行中..."
+					: "[pi-git: auto-commit] Committing...",
+			);
+
 			// 全ファイルをステージングして1つのコミット
 			await stageFiles(pi, changedFiles, ctx.cwd);
 			const { code: exitCode, stderr } = await pi.exec(
@@ -105,10 +124,6 @@ export default function (pi: ExtensionAPI) {
 				["commit", "-m", commitMessage],
 				{ cwd: ctx.cwd },
 			);
-
-			const lang = getLanguage(ctx.cwd);
-			const isJapanese =
-				lang === "ja" || lang === "ja-JP" || lang === "japanese";
 
 			if (exitCode !== 0) {
 				await resetStaging(pi, ctx.cwd);
@@ -127,6 +142,7 @@ export default function (pi: ExtensionAPI) {
 				);
 			}
 		} finally {
+			ctx.ui.setStatus(STATUS_ID, "");
 			setAggCommitRunning(false);
 		}
 	});
