@@ -137,21 +137,16 @@ export async function analyzeDiff(
 ): Promise<Hunk[]> {
 	const model = ctx.model;
 	if (!model) {
-		console.warn("[pi-git] No model configured, using file-based fallback");
 		return fallbackFileBasedHunks(diff);
 	}
-	console.log(`[pi-git] Using model: ${model.provider}/${model.id}`);
 
 	const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
 	if (!auth.ok) {
-		console.warn(`[pi-git] Auth failed: ${auth.error}, using file-based fallback`);
 		return fallbackFileBasedHunks(diff);
 	}
-	console.log("[pi-git] API key resolved successfully");
 
 	try {
 		const lang = getCommitMessageLanguage();
-		console.log(`[pi-git] Requesting AI analysis (language: ${lang})...`);
 		const context: Context = {
 			systemPrompt: getSystemPrompt(lang),
 			messages: [
@@ -169,24 +164,17 @@ export async function analyzeDiff(
 			signal: ctx.signal,
 		});
 
-		console.log(`[pi-git] AI response received (stopReason: ${result.stopReason}, tokens: ${result.usage?.totalTokens ?? "unknown"})`);
-
 		const text = result.content
 			.filter((c): c is { type: "text"; text: string } => c.type === "text")
 			.map((c) => c.text)
 			.join("");
 
-		console.log(`[pi-git] AI response text length: ${text.length} chars`);
-
 		const hunks = parseHunks(text);
 		if (hunks.length === 0) {
-			console.warn("[pi-git] Failed to parse AI response, using file-based fallback");
 			return fallbackFileBasedHunks(diff);
 		}
-		console.log(`[pi-git] Parsed ${hunks.length} hunk(s) from AI response`);
 		return hunks;
-	} catch (error) {
-		console.error(`[pi-git] AI call failed: ${error instanceof Error ? error.message : String(error)}`);
+	} catch {
 		return fallbackFileBasedHunks(diff);
 	}
 }
