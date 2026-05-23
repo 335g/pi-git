@@ -11,6 +11,8 @@ import { join } from "node:path";
 export interface PiGitSettings {
 	/** Display and commit message language (e.g., "en", "ja") */
 	lang?: string;
+	/** Whether to automatically run git-agg-commit after assistant response */
+	autoAggCommit?: boolean;
 }
 
 const CONFIG_DIR = join(homedir(), ".config", "pi-git");
@@ -18,6 +20,7 @@ const SETTINGS_FILE = join(CONFIG_DIR, "settings.json");
 
 const DEFAULT_SETTINGS: PiGitSettings = {
 	lang: "en",
+	autoAggCommit: false,
 };
 
 function loadSettingsFromDisk(): PiGitSettings {
@@ -60,4 +63,12 @@ export function getLanguage(): string {
 
 export function setLanguage(lang: string): void {
 	saveSettings({ lang });
+}
+
+export function getAutoAggCommit(): boolean {
+	return getSettings().autoAggCommit ?? false;
+}
+
+export function setAutoAggCommit(enabled: boolean): void {
+	saveSettings({ autoAggCommit: enabled });
 }
