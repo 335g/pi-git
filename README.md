@@ -45,8 +45,8 @@ Automatically analyzes the working tree diff, splits changes into logical hunks,
 #### What it does
 
 1. **Preparation** — Verifies the current directory is a git repository and detects changes.
-2. **Diff collection** — Gathers diff from both tracked (`git diff HEAD`) and untracked files.
-3. **Hunk analysis** — Sends the diff to the active AI model to split changes into logical hunks.
+2. **Diff snapshot** — Temporarily stashes all changes (including untracked files) via `git stash push -u`, captures the diff, then restores the working tree with `git stash pop`. This freezes the diff so concurrent edits do not affect analysis.
+3. **Hunk analysis** — Sends the snapshotted diff to the active AI model to split changes into logical hunks.
 4. **Message generation** — Each hunk gets a Conventional Commits message (e.g., `feat: add user login`).
 5. **Staging & committing** — Files are staged per-hunk and committed with the generated message.
 
@@ -94,6 +94,7 @@ The language setting is saved to `~/.config/pi-git/settings.json` and reused acr
 | Pre-commit hook fails | Resets staging and warns; continues with remaining hunks |
 | AI model unavailable / auth fails | Falls back to file-per-hunk splitting |
 | Untracked files | Included in diff analysis and committed |
+| User edits files during execution | Safe: diff is snapshotted at the start via `git stash` so analysis is not affected by concurrent edits |
 
 #### Status display
 
