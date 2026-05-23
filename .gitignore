@@ -1,5 +1,5 @@
 .env
-/.direnv
+.direnv/
 node_modules
 
 
@@ -8,3 +8,5 @@ apm_modules/
 
 .agents
 .claude
+
+.pi/
