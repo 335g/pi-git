@@ -17,6 +17,8 @@ import { analyzeDiff } from "../core/diff-analyzer.js";
 import { sanitizeHunk } from "../core/commit-message.js";
 import { setLanguage, getLanguage } from "../utils/settings.js";
 
+let isAutoCommitRunning = false;
+
 const STATUS_ID = "pi-git-auto-commit";
 
 function parseLangArg(args: string): string | undefined {
@@ -63,6 +65,9 @@ export async function handleAutoCommit(
 		return;
 	}
 
+	isAutoCommitRunning = true;
+
+	try {
 	ctx.ui.setStatus(STATUS_ID, statusText(lang, "prepare"));
 
 	// 2. Check git repository
@@ -79,29 +84,24 @@ export async function handleAutoCommit(
 		return;
 	}
 
-	// 4. Get full diff including tracked changes and untracked files
+	// 4. Snapshot changes via stash to freeze the diff
 	ctx.ui.setStatus(STATUS_ID, statusText(lang, "collectDiff"));
-	const { stdout: trackedDiff, code: trackedCode } = await pi.exec("git", ["diff", "HEAD"]);
-	if (trackedCode !== 0) {
+	const { code: stashCode } = await pi.exec("git", ["stash", "push", "-u", "-m", "pi-git-auto-commit"]);
+	if (stashCode !== 0) {
 		ctx.ui.setStatus(STATUS_ID, "");
-		ctx.ui.notify("Failed to get diff", "warning");
+		ctx.ui.notify("Failed to stash changes", "warning");
 		return;
 	}
 
-	// Collect untracked files
-	const { stdout: untrackedFiles } = await pi.exec("git", ["ls-files", "--others", "--exclude-standard"]);
-	const untrackedList = untrackedFiles.split("\n").filter((f) => f.trim());
-
-	let untrackedDiff = "";
-	for (const file of untrackedList) {
-		const { stdout: content } = await pi.exec("cat", [file]);
-		untrackedDiff += `diff --git a/${file} b/${file}\nnew file mode 100644\nindex 0000000..${file}\n--- /dev/null\n+++ b/${file}\n@@ -0,0 +1,${content.split("\n").length} @@\n`;
-		for (const line of content.split("\n")) {
-			untrackedDiff += `+${line}\n`;
-		}
+	let diff = "";
+	try {
+		const { stdout: stashDiff } = await pi.exec("git", ["stash", "show", "-p", "stash@{0}"]);
+		diff = stashDiff;
+	} finally {
+		// Always pop the stash to restore working tree
+		await pi.exec("git", ["stash", "pop"]);
 	}
 
-	const diff = trackedDiff + untrackedDiff;
 	if (!diff.trim()) {
 		ctx.ui.setStatus(STATUS_ID, "");
 		ctx.ui.notify("No changes to commit", "info");
@@ -155,19 +155,22 @@ export async function handleAutoCommit(
 		committedCount++;
 	}
 
-	// 8. Notify completion
-	ctx.ui.setStatus(STATUS_ID, "");
-	if (committedCount > 0 && failedCount === 0) {
-		ctx.ui.notify(
-			`Created ${committedCount} commit${committedCount > 1 ? "s" : ""}`,
-			"info",
-		);
-	} else if (committedCount > 0 && failedCount > 0) {
-		ctx.ui.notify(
-			`Created ${committedCount} commit${committedCount > 1 ? "s" : ""}, ${failedCount} failed`,
-			"warning",
-		);
-	} else {
-		ctx.ui.notify("All commits failed", "error");
+		// 8. Notify completion
+		ctx.ui.setStatus(STATUS_ID, "");
+		if (committedCount > 0 && failedCount === 0) {
+			ctx.ui.notify(
+				`Created ${committedCount} commit${committedCount > 1 ? "s" : ""}`,
+				"info",
+			);
+		} else if (committedCount > 0 && failedCount > 0) {
+			ctx.ui.notify(
+				`Created ${committedCount} commit${committedCount > 1 ? "s" : ""}, ${failedCount} failed`,
+				"warning",
+			);
+		} else {
+			ctx.ui.notify("All commits failed", "error");
+		}
+	} finally {
+		isAutoCommitRunning = false;
 	}
 }
