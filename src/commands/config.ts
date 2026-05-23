@@ -76,6 +76,7 @@ export async function handleConfig(
 	let list = false;
 	let showOrigin = false;
 	let keys = false;
+	let help = false;
 	const positional: string[] = [];
 
 	for (const token of tokens) {
@@ -83,7 +84,42 @@ export async function handleConfig(
 		else if (token === "--list") list = true;
 		else if (token === "--show-origin") showOrigin = true;
 		else if (token === "--keys") keys = true;
+		else if (token === "--help") help = true;
 		else positional.push(token);
+	}
+
+	if (help || positional.length === 0) {
+		const lines = ja
+			? [
+					"/git-config <key> [value] [--global] [--list] [--show-origin] [--keys] [--help]",
+					"",
+					"サブコマンド:",
+					"  <key>           設定値を取得",
+					"  <key> <value>   設定値を変更",
+					"",
+					"フラグ:",
+					"  --global        グローバル設定に対して操作",
+					"  --list           すべての設定値を一覧表示",
+					"  --show-origin    値の取得元（default/global/local）を表示",
+					"  --keys           有効なキー一覧と説明を表示",
+					"  --help           このヘルプを表示",
+				]
+			: [
+					"/git-config <key> [value] [--global] [--list] [--show-origin] [--keys] [--help]",
+					"",
+					"Subcommands:",
+					"  <key>           Get the value of a setting",
+					"  <key> <value>   Set the value of a setting",
+					"",
+					"Flags:",
+					"  --global        Operate on global settings",
+					"  --list           List all configured values",
+					"  --show-origin    Show value origin (default/global/local)",
+					"  --keys           Show valid keys with descriptions",
+					"  --help           Show this help message",
+				];
+		ctx.ui.notify(lines.join("\n"), "info");
+		return;
 	}
 
 	if (keys) {

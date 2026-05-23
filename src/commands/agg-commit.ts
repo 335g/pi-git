@@ -56,11 +56,36 @@ export async function handleAggCommit(
 	ctx: ExtensionContext,
 	args: string,
 ): Promise<void> {
+	const lang = getLanguage(ctx.cwd);
+	const ja = isJapanese(lang);
+
+	if (/--help/.test(args)) {
+		const lines = ja
+			? [
+					"/git-agg-commit [--lang=<lang>] [--help]",
+					"",
+					"オプション:",
+					"  --lang=<lang>  一時的に言語を上書き（保存されません）",
+					"  --help         このヘルプを表示",
+				]
+			: [
+					"/git-agg-commit [--lang=<lang>] [--help]",
+					"",
+					"Options:",
+					"  --lang=<lang>  Temporarily override language (not saved)",
+					"  --help         Show this help message",
+				];
+		if (ctx.hasUI) {
+			ctx.ui.notify(lines.join("\n"), "info");
+		}
+		return;
+	}
+
 	// Parse language argument (temporary override, does not save)
 	const langArg = parseLangArg(args);
-	let lang = getLanguage(ctx.cwd);
+	let runLang = lang;
 	if (langArg) {
-		lang = langArg;
+		runLang = langArg;
 		ctx.ui.notify(`Language set to: ${langArg} (this run only)`, "info");
 	}
 
@@ -72,7 +97,7 @@ export async function handleAggCommit(
 	// Prevent concurrent executions to avoid staging area conflicts
 	if (isAggCommitRunning) {
 		ctx.ui.notify(
-			isJapanese(lang) ? "git-agg-commit 実行中です。完了してから再度実行してください。" : "git-agg-commit is already running. Please wait for it to complete.",
+			isJapanese(runLang) ? "git-agg-commit 実行中です。完了してから再度実行してください。" : "git-agg-commit is already running. Please wait for it to complete.",
 			"warning",
 		);
 		return;
@@ -88,7 +113,7 @@ export async function handleAggCommit(
 	}
 
 	try {
-	ctx.ui.setStatus(STATUS_ID, statusText(lang, "prepare", autoCommit));
+	ctx.ui.setStatus(STATUS_ID, statusText(runLang, "prepare", autoCommit));
 
 	// 2. Check git repository
 	if (!(await isGitRepository(pi, ctx.cwd))) {
@@ -105,7 +130,7 @@ export async function handleAggCommit(
 	}
 
 	// 4. Snapshot changes via stash to freeze the diff
-	ctx.ui.setStatus(STATUS_ID, statusText(lang, "collectDiff", autoCommit));
+	ctx.ui.setStatus(STATUS_ID, statusText(runLang, "collectDiff", autoCommit));
 	const { code: stashCode } = await pi.exec("git", ["stash", "push", "-u", "-m", "pi-git-agg-commit"], { cwd: ctx.cwd });
 	if (stashCode !== 0) {
 		ctx.ui.setStatus(STATUS_ID, "");
@@ -136,7 +161,7 @@ export async function handleAggCommit(
 	}
 
 	// 5. Analyze diff into logical hunks
-	ctx.ui.setStatus(STATUS_ID, statusText(lang, "analyze", autoCommit));
+	ctx.ui.setStatus(STATUS_ID, statusText(runLang, "analyze", autoCommit));
 	let hunks = await analyzeDiff(pi, ctx, diff);
 	if (hunks.length === 0) {
 		ctx.ui.setStatus(STATUS_ID, "");
@@ -145,7 +170,7 @@ export async function handleAggCommit(
 	}
 
 	// 6. Sanitize commit messages
-	ctx.ui.setStatus(STATUS_ID, statusText(lang, "generateMessage", autoCommit));
+	ctx.ui.setStatus(STATUS_ID, statusText(runLang, "generateMessage", autoCommit));
 	hunks = hunks.map(sanitizeHunk);
 
 	// Deduplicate files across hunks: each file belongs only to its first hunk
@@ -162,7 +187,7 @@ export async function handleAggCommit(
 		.filter((hunk) => hunk.files.length > 0);
 
 	// 7. Stage and commit each hunk
-	ctx.ui.setStatus(STATUS_ID, statusText(lang, "commit", autoCommit));
+	ctx.ui.setStatus(STATUS_ID, statusText(runLang, "commit", autoCommit));
 	let committedCount = 0;
 	let failedCount = 0;
 	let skippedCount = 0;

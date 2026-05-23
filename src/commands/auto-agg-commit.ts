@@ -50,6 +50,39 @@ export async function handleAutoAggCommit(
 	const current = getAutoAggCommit();
 	const lang = getSettings(ctx.cwd).lang ?? "en";
 
+	if (trimmed === "--help") {
+		const ja = isJapanese(lang);
+		const lines = ja
+			? [
+					"/git-auto-agg-commit [on|off|toggle] [--help]",
+					"",
+					"サブコマンド:",
+					"  on      自動 git-agg-commit を有効にする",
+					"  off     自動 git-agg-commit を無効にする",
+					"  toggle  自動 git-agg-commit の有効/無効を切り替える",
+					"",
+					"フラグ:",
+					"  --help  このヘルプを表示",
+					"",
+					"引数を省略すると、現在の状態を表示します。",
+				]
+			: [
+					"/git-auto-agg-commit [on|off|toggle] [--help]",
+					"",
+					"Subcommands:",
+					"  on      Enable auto git-agg-commit",
+					"  off     Disable auto git-agg-commit",
+					"  toggle  Toggle auto git-agg-commit",
+					"",
+					"Flags:",
+					"  --help  Show this help message",
+					"",
+					"When called without arguments, shows the current status.",
+				];
+		ctx.ui.notify(lines.join("\n"), "info");
+		return;
+	}
+
 	let next: boolean;
 	switch (trimmed) {
 		case "on":
