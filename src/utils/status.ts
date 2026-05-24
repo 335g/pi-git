@@ -1,7 +1,7 @@
 import type { ExtensionUIContext } from "@earendil-works/pi-coding-agent";
 import { getSettings, getAutoAggCommit } from "./settings.js";
 
-const AUTO_AGG_COMMIT_STATUS_KEY = "!pi-git-auto-agg-commit";
+const AUTO_AGG_COMMIT_STATUS_KEY = "pi-git-agg-commit";
 
 function isJapanese(lang: string): boolean {
 	return lang === "ja" || lang === "ja-JP" || lang === "japanese";

@@ -236,7 +236,9 @@ export async function handleAggCommit(
 	}
 
 		// 8. Notify completion
-		ctx.ui.setStatus(STATUS_ID, "");
+		if (!autoCommit) {
+			ctx.ui.setStatus(STATUS_ID, "");
+		}
 		const parts: string[] = [];
 		if (committedCount > 0) parts.push(`Created ${committedCount} commit${committedCount > 1 ? "s" : ""}`);
 		if (skippedCount > 0) parts.push(`${skippedCount} skipped`);
