@@ -162,6 +162,7 @@ export async function analyzeDiff(
 			apiKey: auth.apiKey,
 			headers: auth.headers,
 			signal: ctx.signal,
+			reasoning: "minimal",
 		});
 
 		const text = result.content
