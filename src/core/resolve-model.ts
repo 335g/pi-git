@@ -1,0 +1,37 @@
+/**
+ * Model resolution helper for pi-git commands.
+ *
+ * Resolves the AI model to use based on configuration or session context.
+ */
+
+import type { Api, Model } from "@earendil-works/pi-ai";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { getAnalysisModel } from "../utils/settings.js";
+
+/**
+ * Resolve the model to use for AI operations.
+ *
+ * Priority:
+ * 1. Configured `analysis_model` in settings (format: "provider/model-id")
+ * 2. Current session model (`ctx.model`)
+ *
+ * @returns The resolved model, or undefined if no model is available
+ */
+export function resolveModel(ctx: ExtensionContext): Model<Api> | undefined {
+  // Try configured model first
+  const configuredModel = getAnalysisModel(ctx.cwd);
+  if (configuredModel) {
+    const slashIndex = configuredModel.indexOf("/");
+    if (slashIndex > 0) {
+      const provider = configuredModel.substring(0, slashIndex);
+      const modelId = configuredModel.substring(slashIndex + 1);
+      const found = ctx.modelRegistry.find(provider, modelId);
+      if (found) {
+        return found;
+      }
+    }
+  }
+
+  // Fall back to session model
+  return ctx.model;
+}

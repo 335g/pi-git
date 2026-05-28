@@ -15,6 +15,7 @@ import type {
 import { isJapanese } from "../utils/lang.js";
 import { getLanguage } from "../utils/settings.js";
 import { sanitizeCommitMessage } from "./commit-message.js";
+import { resolveModel } from "./resolve-model.js";
 
 interface SimpleMessage {
   role: string;
@@ -108,7 +109,7 @@ export async function generateAutoCommitMessage(
   messages: SimpleMessage[],
   changedFiles: string[],
 ): Promise<string> {
-  const model = ctx.model;
+  const model = resolveModel(ctx);
   if (!model) {
     return sanitizeCommitMessage("chore: apply changes", changedFiles);
   }

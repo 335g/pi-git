@@ -23,7 +23,7 @@ import {
   VALID_KEYS_META,
 } from "../utils/settings.js";
 
-type ValidKey = "lang" | "auto_agg_commit";
+type ValidKey = "lang" | "auto_agg_commit" | "analysis_model";
 
 function isValidKey(key: string): key is ValidKey {
   return VALID_KEYS_META.some((meta) => meta.key === key);
@@ -43,6 +43,9 @@ function validateValue(key: ValidKey, value: string): string | boolean {
         );
       }
       return value === "true";
+    case "analysis_model":
+      // Model ID is a free-form string (e.g., "anthropic/claude-3-5-sonnet-20241022")
+      return value;
     default:
       throw new Error(`Unknown key: ${key}`);
   }

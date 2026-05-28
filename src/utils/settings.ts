@@ -16,6 +16,8 @@ export interface PiGitSettings {
   lang?: string;
   /** Whether to automatically run git-agg-commit after assistant response */
   auto_agg_commit?: boolean;
+  /** Model to use for diff analysis (format: "provider/model-id") */
+  analysis_model?: string;
 }
 
 export type SettingOrigin = "default" | "global" | "local";
@@ -50,11 +52,20 @@ export const VALID_KEYS_META: KeyMeta[] = [
       "Whether to automatically run git-agg-commit after assistant response",
     valid_values: "true or false",
   },
+  {
+    key: "analysis_model",
+    type: "string",
+    description_ja: "diff分析に使用するAIモデル（形式: provider/model-id）",
+    description_en:
+      "AI model to use for diff analysis (format: provider/model-id)",
+    valid_values: "e.g., anthropic/claude-3-5-sonnet-20241022",
+  },
 ];
 
 export const DEFAULT_SETTINGS: PiGitSettings = {
   lang: "en",
   auto_agg_commit: false,
+  analysis_model: "",
 };
 
 export const GLOBAL_CONFIG_DIR = join(homedir(), ".config", "pi-git");
@@ -161,6 +172,11 @@ export function getLanguage(cwd?: string): string {
 
 export function getAutoAggCommit(cwd?: string): boolean {
   return getSettings(cwd).auto_agg_commit ?? false;
+}
+
+export function getAnalysisModel(cwd?: string): string | undefined {
+  const model = getSettings(cwd).analysis_model;
+  return model?.trim() ? model.trim() : undefined;
 }
 
 // ───────────────────────────────────────────────

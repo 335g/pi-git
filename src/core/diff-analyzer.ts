@@ -1,7 +1,7 @@
 /**
  * Diff analysis and hunk splitting logic
  *
- * Uses the current AI model to analyze git diff and split changes into
+ * Uses the configured or session AI model to analyze git diff and split changes into
  * logical hunks with Conventional Commits messages.
  */
 
@@ -14,6 +14,7 @@ import type {
 import type { Hunk } from "../types.js";
 import { isJapanese } from "../utils/lang.js";
 import { getLanguage } from "../utils/settings.js";
+import { resolveModel } from "./resolve-model.js";
 
 function getSystemPrompt(lang: string): string {
   if (isJapanese(lang)) {
@@ -140,7 +141,7 @@ export async function analyzeDiff(
   ctx: ExtensionContext,
   diff: string,
 ): Promise<Hunk[]> {
-  const model = ctx.model;
+  const model = resolveModel(ctx);
   if (!model) {
     return fallbackFileBasedHunks(diff);
   }
