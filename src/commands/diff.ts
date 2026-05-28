@@ -6,7 +6,7 @@
  */
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { matchesKey, Key, truncateToWidth } from "@earendil-works/pi-tui";
+import { matchesKey, Key, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { Component, TUI } from "@earendil-works/pi-tui";
 import type { Hunk } from "../types.js";
 import {
@@ -41,6 +41,7 @@ interface ViewerState {
 	files: FileEntry[];
 	selectedFileIdx: number;
 	fileDiffs: Map<string, string>;
+	diffScrollOffset: number;
 	messageEditMode: boolean;
 	editBuffer: string;
 	editCursor: number;
@@ -66,17 +67,9 @@ function fgYellow(s: string): string { return `${ESC}33m${s}${ESC}0m`; }
 function fgCyan(s: string): string { return `${ESC}36m${s}${ESC}0m`; }
 function bgSelected(s: string): string { return `${ESC}7m${s}${ESC}0m`; }
 
-function visibleLen(s: string): number {
-	return s.replace(/\x1b\[[0-9;]*m/g, "").length;
-}
-
-function padOrTruncate(s: string, width: number): string {
-	const len = visibleLen(s);
-	if (len > width) {
-		const plain = s.replace(/\x1b\[[0-9;]*m/g, "");
-		return plain.slice(0, Math.max(0, width - 3)) + "...";
-	}
-	return s + " ".repeat(Math.max(0, width - len));
+/** Pad or truncate to exact display width using pi-tui's ANSI-aware logic. */
+function padToWidth(s: string, width: number): string {
+	return truncateToWidth(s, width, "", true);
 }
 
 // ───────────────────────────────────────────────
@@ -132,6 +125,7 @@ class DiffViewer implements Component {
 			files,
 			selectedFileIdx: 0,
 			fileDiffs,
+			diffScrollOffset: 0,
 			messageEditMode: false,
 			editBuffer: firstHunk?.message ?? "",
 			editCursor: (firstHunk?.message ?? "").length,
@@ -179,37 +173,74 @@ class DiffViewer implements Component {
 			return this.buildHelpLines(width);
 		}
 
-		const treeWidth = Math.min(35, Math.max(20, Math.floor(width * 0.28)));
-		const diffWidth = Math.max(10, width - treeWidth - 1);
+		// Border (1) + padding (1) on each side = 4 chars total reserved
+		const innerWidth = Math.max(1, width - 4);
+		const treeWidth = Math.min(35, Math.max(20, Math.floor(innerWidth * 0.28)));
+		const diffWidth = Math.max(10, innerWidth - treeWidth - 1);
 
-		const lines: string[] = [];
+		// Terminal height from TUI or process.stdout; default to 24 if unavailable
+		const termHeight = this.tui?.terminal.rows ?? process.stdout.rows ?? 24;
+		// Reserve: top border (1) + top pad (3) + bottom pad (3) + bottom border (1) = 8
+		//         + top bar (1) + sep (1) + bottom sep (1) + guide (1) = 4
+		//         = 12 total reserved
+		const contentHeight = Math.max(3, termHeight - 12);
+
+		const innerLines: string[] = [];
 
 		// 1. Top bar: commit message + file count
-		lines.push(...this.renderTopBar(width));
+		innerLines.push(...this.renderTopBar(innerWidth));
 
 		// 2. Separator
-		lines.push("─".repeat(width));
+		innerLines.push("─".repeat(innerWidth));
 
 		// 3. Content area: tree + diff side by side
-		const treeLines = this.renderTree(treeWidth);
-		const diffLines = this.renderDiff(diffWidth);
+		const treeLines = this.renderTree(treeWidth, contentHeight);
+		const diffLines = this.renderDiff(diffWidth, contentHeight);
 
 		const maxContentLines = Math.max(treeLines.length, diffLines.length);
 		for (let i = 0; i < maxContentLines; i++) {
 			const treeLine = treeLines[i] ?? "";
 			const diffLine = diffLines[i] ?? "";
-			const divider = "│";
-			const combined = padOrTruncate(treeLine, treeWidth) + divider + padOrTruncate(diffLine, diffWidth).slice(0, diffWidth);
-			lines.push(truncateToWidth(combined, width));
+			const treePart = padToWidth(treeLine, treeWidth);
+			const diffPart = padToWidth(diffLine, diffWidth);
+			innerLines.push(treePart + "│" + diffPart);
 		}
 
 		// 4. Bottom separator
-		lines.push("─".repeat(width));
+		innerLines.push("─".repeat(innerWidth));
 
 		// 5. Guide / status
-		lines.push(...this.renderGuide(width));
+		innerLines.push(...this.renderGuide(innerWidth));
 
-		return lines;
+		// Clamp inner lines to fit within available vertical space
+		const maxInnerRows = Math.max(1, termHeight - 8); // minus borders (2) + padding (6)
+		const clampedInner = innerLines.slice(0, maxInnerRows);
+
+		// Pad to maxInnerRows so the frame always fills the overlay height
+		while (clampedInner.length < maxInnerRows) {
+			clampedInner.push("");
+		}
+
+		// Build final bordered output with rounded corners
+		const finalLines: string[] = [];
+		finalLines.push("╭" + "─".repeat(Math.max(1, width - 2)) + "╮");
+		// Top padding (3 lines)
+		for (let i = 0; i < 3; i++) {
+			finalLines.push("│" + " ".repeat(Math.max(1, width - 2)) + "│");
+		}
+
+		for (const line of clampedInner) {
+			finalLines.push("│ " + padToWidth(line, innerWidth) + " │");
+		}
+
+		// Bottom padding (3 lines)
+		for (let i = 0; i < 3; i++) {
+			finalLines.push("│" + " ".repeat(Math.max(1, width - 2)) + "│");
+		}
+		finalLines.push("╰" + "─".repeat(Math.max(1, width - 2)) + "╯");
+
+		// Clamp to terminal height
+		return finalLines.slice(0, termHeight);
 	}
 
 	private renderTopBar(width: number): string[] {
@@ -228,8 +259,8 @@ class DiffViewer implements Component {
 			? ` (${hunkFiles}/${totalFiles} ファイル)`
 			: ` (${hunkFiles}/${totalFiles} files)`;
 
-		const msgLen = visibleLen(msgLine);
-		const countLen = visibleLen(countText);
+		const msgLen = visibleWidth(msgLine);
+		const countLen = visibleWidth(countText);
 		let line1: string;
 		if (msgLen + countLen > width) {
 			line1 = truncateToWidth(msgLine, width - countLen) + countText;
@@ -250,7 +281,7 @@ class DiffViewer implements Component {
 		return [line1];
 	}
 
-	private renderTree(width: number): string[] {
+	private renderTree(width: number, maxHeight: number): string[] {
 		const lines: string[] = [];
 		const hunkNum = this.state.currentHunkIdx + 1;
 		const hunkTotal = this.state.hunks.length;
@@ -258,9 +289,14 @@ class DiffViewer implements Component {
 			? ` ファイル (${hunkNum}/${hunkTotal})`
 			: ` Files (${hunkNum}/${hunkTotal})`;
 		lines.push(bold(truncateToWidth(title, width)));
-		lines.push("");
 
-		for (let i = 0; i < this.state.files.length; i++) {
+		// Show files with scroll: keep selected file visible within maxHeight
+		// Account for title (1 line) -> available for files = maxHeight - 1
+		const fileDisplayCount = Math.max(1, maxHeight - 1);
+		const startIdx = Math.max(0, Math.min(this.state.selectedFileIdx, Math.max(0, this.state.files.length - fileDisplayCount)));
+		const endIdx = Math.min(this.state.files.length, startIdx + fileDisplayCount);
+
+		for (let i = startIdx; i < endIdx; i++) {
 			const f = this.state.files[i];
 			const isSelected = i === this.state.selectedFileIdx;
 			const statusChar = this.statusChar(f.status);
@@ -287,6 +323,11 @@ class DiffViewer implements Component {
 			lines.push(truncateToWidth(styled, width));
 		}
 
+		// Pad to maxHeight so the content area has uniform height
+		while (lines.length < maxHeight) {
+			lines.push("");
+		}
+
 		return lines;
 	}
 
@@ -300,41 +341,51 @@ class DiffViewer implements Component {
 		return status.trim().charAt(0) || " ";
 	}
 
-	private renderDiff(width: number): string[] {
+	private renderDiff(width: number, maxHeight: number): string[] {
 		const file = this.state.files[this.state.selectedFileIdx];
-		if (!file) return [];
+		if (!file) {
+			const empty: string[] = [];
+			while (empty.length < maxHeight) empty.push("");
+			return empty;
+		}
 
 		const lines: string[] = [];
 		const title = this.isJa ? " 差分: " : " Diff: ";
 		lines.push(bold(truncateToWidth(title + file.path, width)));
-		lines.push("");
 
 		const diff = this.state.fileDiffs.get(file.path);
 		if (!diff) {
 			lines.push(this.isJa ? " 差分を読み込み中..." : " Loading diff...");
-			return lines;
-		}
-
-		if (diff.startsWith("差分なし") || diff.startsWith("No diff") || diff.startsWith("差分の取得に失敗")) {
+		} else if (diff.startsWith("差分なし") || diff.startsWith("No diff") || diff.startsWith("差分の取得に失敗")) {
 			lines.push(" " + diff);
-			return lines;
+		} else {
+			let diffLines = diff.split("\n");
+			// Remove trailing empty line caused by diff ending with a newline
+			if (diffLines.length > 0 && diffLines[diffLines.length - 1] === "") {
+				diffLines.pop();
+			}
+			const start = this.state.diffScrollOffset;
+			const visible = diffLines.slice(start, start + Math.max(1, maxHeight - 1));
+			for (const line of visible) {
+				let styled: string;
+				if (line.startsWith("+")) {
+					styled = fgGreen(truncateToWidth(line, width));
+				} else if (line.startsWith("-")) {
+					styled = fgRed(truncateToWidth(line, width));
+				} else if (line.startsWith("@@")) {
+					styled = fgCyan(truncateToWidth(line, width));
+				} else if (line.startsWith("diff ") || line.startsWith("index ") || line.startsWith("--- ") || line.startsWith("+++ ") || line.startsWith("Binary ")) {
+					styled = dim(truncateToWidth(line, width));
+				} else {
+					styled = truncateToWidth(line, width);
+				}
+				lines.push(styled);
+			}
 		}
 
-		const diffLines = diff.split("\n");
-		for (const line of diffLines) {
-			let styled: string;
-			if (line.startsWith("+")) {
-				styled = fgGreen(truncateToWidth(line, width));
-			} else if (line.startsWith("-")) {
-				styled = fgRed(truncateToWidth(line, width));
-			} else if (line.startsWith("@@")) {
-				styled = fgCyan(truncateToWidth(line, width));
-			} else if (line.startsWith("diff ") || line.startsWith("index ") || line.startsWith("--- ") || line.startsWith("+++ ") || line.startsWith("Binary ")) {
-				styled = dim(truncateToWidth(line, width));
-			} else {
-				styled = truncateToWidth(line, width);
-			}
-			lines.push(styled);
+		// Pad to maxHeight so the content area has uniform height
+		while (lines.length < maxHeight) {
+			lines.push("");
 		}
 
 		return lines;
@@ -813,14 +864,6 @@ export async function handleDiff(
 		return;
 	}
 
-	// 2. Check for changes
-	if (!(await hasChanges(pi, ctx.cwd))) {
-		if (ctx.hasUI) {
-			ctx.ui.notify(runIsJa ? "変更がありません" : "No changes", "info");
-		}
-		return;
-	}
-
 	if (!ctx.hasUI) {
 		return;
 	}
@@ -828,7 +871,32 @@ export async function handleDiff(
 	const STATUS_ID = "pi-git-diff";
 	ctx.ui.setStatus(STATUS_ID, runIsJa ? "[pi-git] diffを準備中..." : "[pi-git] Preparing diff...");
 
-	// 3. Snapshot changes via stash
+	// 3. Get changed files before stashing
+	const changedFiles = await getChangedFilesWithStatus(pi, ctx.cwd);
+
+	if (changedFiles.length === 0) {
+		// No changes: still show the viewer (empty state)
+		ctx.ui.setStatus(STATUS_ID, "");
+		await ctx.ui.custom<void>((tui, _theme, _keybindings, done) => {
+			const viewer = new DiffViewer(pi, ctx, runLang, [], [], new Map(), ctx.cwd);
+			viewer.setTUI(tui);
+			viewer.setOnDone(() => {
+				done(undefined);
+			});
+			return viewer;
+		}, {
+			overlay: true,
+			overlayOptions: {
+				width: "100%",
+				maxHeight: "100%",
+				anchor: "top-left",
+				margin: { top: 2, bottom: 2, left: 1, right: 1 },
+			},
+		});
+		return;
+	}
+
+	// 4. Snapshot changes via stash
 	const stashCode = await stashSnapshot(pi, ctx.cwd);
 	if (stashCode !== 0) {
 		ctx.ui.setStatus(STATUS_ID, "");
@@ -837,16 +905,9 @@ export async function handleDiff(
 	}
 
 	try {
-		// 4. Get diff and changed files
+		// 5. Get diff from stash
 		ctx.ui.setStatus(STATUS_ID, runIsJa ? "[pi-git] diffを収集中..." : "[pi-git] Collecting diff...");
 		const diff = await getStashDiff(pi, ctx.cwd);
-		const changedFiles = await getChangedFilesWithStatus(pi, ctx.cwd);
-
-		if (!diff.trim() || changedFiles.length === 0) {
-			ctx.ui.setStatus(STATUS_ID, "");
-			ctx.ui.notify(runIsJa ? "変更がありません" : "No changes", "info");
-			return;
-		}
 
 		// Pre-split diff by file for the viewer
 		const fileDiffs = splitDiffByFile(diff);
@@ -890,7 +951,8 @@ export async function handleDiff(
 			overlayOptions: {
 				width: "100%",
 				maxHeight: "100%",
-				margin: 0,
+				anchor: "top-left",
+				margin: { top: 2, bottom: 2, left: 1, right: 1 },
 			},
 		});
 	} finally {
