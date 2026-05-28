@@ -8,6 +8,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { handleAggCommit } from "./commands/agg-commit.js";
 import { handleAutoAggCommit } from "./commands/auto-agg-commit.js";
 import { handleConfig } from "./commands/config.js";
+import { handleSwitch } from "./commands/switch.js";
 import { handleAutoCommit } from "./core/auto-commit.js";
 import { getAutoAggCommit } from "./utils/settings.js";
 import { updateAutoAggCommitStatus } from "./utils/status.js";
@@ -38,6 +39,13 @@ export default function (pi: ExtensionAPI) {
     description: "Toggle automatic git-agg-commit after assistant responses",
     handler: async (args, ctx) => {
       await handleAutoAggCommit(pi, ctx, args);
+    },
+  });
+
+  pi.registerCommand("git-switch", {
+    description: "Switch between git branches",
+    handler: async (args, ctx) => {
+      await handleSwitch(pi, ctx, args);
     },
   });
 

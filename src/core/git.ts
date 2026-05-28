@@ -73,3 +73,71 @@ export async function resetStaging(
     throw new GitError("Failed to reset staging area", "git reset", code);
   }
 }
+
+export async function getCurrentBranch(
+  pi: ExtensionAPI,
+  cwd?: string,
+): Promise<string> {
+  const { stdout, code } = await pi.exec("git", ["branch", "--show-current"], {
+    cwd,
+  });
+  if (code !== 0) {
+    throw new GitError(
+      "Failed to get current branch",
+      "git branch --show-current",
+      code,
+    );
+  }
+  return stdout.trim();
+}
+
+export async function getBranches(
+  pi: ExtensionAPI,
+  cwd?: string,
+): Promise<{ name: string; isRemote: boolean }[]> {
+  const { stdout, code } = await pi.exec(
+    "git",
+    ["branch", "-a", "--format=%(refname:short)"],
+    { cwd },
+  );
+  if (code !== 0) {
+    throw new GitError("Failed to get branches", "git branch -a", code);
+  }
+  return stdout
+    .split("\n")
+    .filter((line) => line.trim())
+    .map((name) => ({
+      name: name.trim(),
+      isRemote: name.startsWith("origin/"),
+    }));
+}
+
+export async function switchBranch(
+  pi: ExtensionAPI,
+  branch: string,
+  cwd?: string,
+): Promise<{ success: boolean; message: string }> {
+  const { stdout, stderr, code } = await pi.exec("git", ["switch", branch], {
+    cwd,
+  });
+  if (code !== 0) {
+    return { success: false, message: stderr || stdout };
+  }
+  return { success: true, message: stdout };
+}
+
+export async function createAndSwitchBranch(
+  pi: ExtensionAPI,
+  branch: string,
+  cwd?: string,
+): Promise<{ success: boolean; message: string }> {
+  const { stdout, stderr, code } = await pi.exec(
+    "git",
+    ["switch", "-c", branch],
+    { cwd },
+  );
+  if (code !== 0) {
+    return { success: false, message: stderr || stdout };
+  }
+  return { success: true, message: stdout };
+}
