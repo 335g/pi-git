@@ -6,59 +6,55 @@
  * - Local:  <git-root>/.pi-git/settings.json (takes precedence)
  */
 
-import {
-	readFileSync,
-	writeFileSync,
-	mkdirSync,
-	existsSync,
-} from "node:fs";
-import { homedir } from "node:os";
-import { join, dirname } from "node:path";
 import { execSync } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
 
 export interface PiGitSettings {
-	/** Display and commit message language (e.g., "en", "ja") */
-	lang?: string;
-	/** Whether to automatically run git-agg-commit after assistant response */
-	auto_agg_commit?: boolean;
+  /** Display and commit message language (e.g., "en", "ja") */
+  lang?: string;
+  /** Whether to automatically run git-agg-commit after assistant response */
+  auto_agg_commit?: boolean;
 }
 
 export type SettingOrigin = "default" | "global" | "local";
 
 /** Metadata for each valid configuration key */
 export interface KeyMeta {
-	key: string;
-	/** Display type (e.g., "string", "boolean") */
-	type: string;
-	/** Japanese description */
-	description_ja: string;
-	/** English description */
-	description_en: string;
-	/** Valid values hint (optional) */
-	valid_values?: string;
+  key: string;
+  /** Display type (e.g., "string", "boolean") */
+  type: string;
+  /** Japanese description */
+  description_ja: string;
+  /** English description */
+  description_en: string;
+  /** Valid values hint (optional) */
+  valid_values?: string;
 }
 
 /** Metadata for all valid configuration keys */
 export const VALID_KEYS_META: KeyMeta[] = [
-	{
-		key: "lang",
-		type: "string",
-		description_ja: "表示・コミットメッセージの言語設定",
-		description_en: "Display and commit message language",
-		valid_values: '"en" or "ja"',
-	},
-	{
-		key: "auto_agg_commit",
-		type: "boolean",
-		description_ja: "アシスタント応答後の自動コミット有無",
-		description_en: "Whether to automatically run git-agg-commit after assistant response",
-		valid_values: "true or false",
-	},
+  {
+    key: "lang",
+    type: "string",
+    description_ja: "表示・コミットメッセージの言語設定",
+    description_en: "Display and commit message language",
+    valid_values: '"en" or "ja"',
+  },
+  {
+    key: "auto_agg_commit",
+    type: "boolean",
+    description_ja: "アシスタント応答後の自動コミット有無",
+    description_en:
+      "Whether to automatically run git-agg-commit after assistant response",
+    valid_values: "true or false",
+  },
 ];
 
 export const DEFAULT_SETTINGS: PiGitSettings = {
-	lang: "en",
-	auto_agg_commit: false,
+  lang: "en",
+  auto_agg_commit: false,
 };
 
 export const GLOBAL_CONFIG_DIR = join(homedir(), ".config", "pi-git");
@@ -71,46 +67,46 @@ const LOCAL_SETTINGS_FILE = "settings.json";
 // ───────────────────────────────────────────────
 
 function loadJson(path: string): PiGitSettings | null {
-	if (!existsSync(path)) return null;
-	try {
-		const raw = readFileSync(path, "utf-8");
-		const parsed = JSON.parse(raw);
-		if (typeof parsed !== "object" || parsed === null) return null;
-		return parsed as PiGitSettings;
-	} catch {
-		return null;
-	}
+  if (!existsSync(path)) return null;
+  try {
+    const raw = readFileSync(path, "utf-8");
+    const parsed = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null) return null;
+    return parsed as PiGitSettings;
+  } catch {
+    return null;
+  }
 }
 
 export function getLocalSettingsPath(cwd?: string): string | null {
-	try {
-		const repoRoot = execSync("git rev-parse --show-toplevel", {
-			cwd,
-			encoding: "utf-8",
-			stdio: ["pipe", "pipe", "ignore"],
-		}).trim();
-		if (!repoRoot) return null;
-		return join(repoRoot, LOCAL_SETTINGS_DIR, LOCAL_SETTINGS_FILE);
-	} catch {
-		return null;
-	}
+  try {
+    const repoRoot = execSync("git rev-parse --show-toplevel", {
+      cwd,
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "ignore"],
+    }).trim();
+    if (!repoRoot) return null;
+    return join(repoRoot, LOCAL_SETTINGS_DIR, LOCAL_SETTINGS_FILE);
+  } catch {
+    return null;
+  }
 }
 
 function loadRaw(cwd?: string): {
-	global: PiGitSettings;
-	local: PiGitSettings | null;
+  global: PiGitSettings;
+  local: PiGitSettings | null;
 } {
-	const global = loadJson(GLOBAL_SETTINGS_FILE) ?? {};
-	const localPath = getLocalSettingsPath(cwd);
-	const local = localPath ? loadJson(localPath) : null;
-	return { global, local };
+  const global = loadJson(GLOBAL_SETTINGS_FILE) ?? {};
+  const localPath = getLocalSettingsPath(cwd);
+  const local = localPath ? loadJson(localPath) : null;
+  return { global, local };
 }
 
 function merge(
-	global: PiGitSettings,
-	local: PiGitSettings | null,
+  global: PiGitSettings,
+  local: PiGitSettings | null,
 ): PiGitSettings {
-	return { ...DEFAULT_SETTINGS, ...global, ...(local ?? {}) };
+  return { ...DEFAULT_SETTINGS, ...global, ...(local ?? {}) };
 }
 
 // ───────────────────────────────────────────────
@@ -120,16 +116,17 @@ function merge(
 const cache = new Map<string, PiGitSettings>();
 
 export function getSettings(cwd?: string): PiGitSettings {
-	const key = cwd ?? process.cwd();
-	if (!cache.has(key)) {
-		const { global, local } = loadRaw(cwd);
-		cache.set(key, merge(global, local));
-	}
-	return { ...cache.get(key)! };
+  const key = cwd ?? process.cwd();
+  if (!cache.has(key)) {
+    const { global, local } = loadRaw(cwd);
+    cache.set(key, merge(global, local));
+  }
+  const cached = cache.get(key);
+  return cached ? { ...cached } : { ...DEFAULT_SETTINGS };
 }
 
 export function clearSettingsCache(): void {
-	cache.clear();
+  cache.clear();
 }
 
 // ───────────────────────────────────────────────
@@ -137,21 +134,21 @@ export function clearSettingsCache(): void {
 // ───────────────────────────────────────────────
 
 export function getSettingOrigin(
-	key: keyof PiGitSettings,
-	cwd?: string,
+  key: keyof PiGitSettings,
+  cwd?: string,
 ): SettingOrigin {
-	const { global, local } = loadRaw(cwd);
-	if (local && key in local) return "local";
-	if (global && key in global) return "global";
-	return "default";
+  const { global, local } = loadRaw(cwd);
+  if (local && key in local) return "local";
+  if (global && key in global) return "global";
+  return "default";
 }
 
 export function getSettingWithOrigin<K extends keyof PiGitSettings>(
-	key: K,
-	cwd?: string,
+  key: K,
+  cwd?: string,
 ): { value: PiGitSettings[K] | undefined; origin: SettingOrigin } {
-	const settings = getSettings(cwd);
-	return { value: settings[key], origin: getSettingOrigin(key, cwd) };
+  const settings = getSettings(cwd);
+  return { value: settings[key], origin: getSettingOrigin(key, cwd) };
 }
 
 // ───────────────────────────────────────────────
@@ -159,11 +156,11 @@ export function getSettingWithOrigin<K extends keyof PiGitSettings>(
 // ───────────────────────────────────────────────
 
 export function getLanguage(cwd?: string): string {
-	return getSettings(cwd).lang || "en";
+  return getSettings(cwd).lang || "en";
 }
 
 export function getAutoAggCommit(cwd?: string): boolean {
-	return getSettings(cwd).auto_agg_commit ?? false;
+  return getSettings(cwd).auto_agg_commit ?? false;
 }
 
 // ───────────────────────────────────────────────
@@ -171,47 +168,28 @@ export function getAutoAggCommit(cwd?: string): boolean {
 // ───────────────────────────────────────────────
 
 export function saveGlobalSettings(settings: Partial<PiGitSettings>): void {
-	mkdirSync(GLOBAL_CONFIG_DIR, { recursive: true });
-	const current = loadJson(GLOBAL_SETTINGS_FILE) ?? {};
-	const updated = { ...current, ...settings };
-	writeFileSync(
-		GLOBAL_SETTINGS_FILE,
-		JSON.stringify(updated, null, 2) + "\n",
-		"utf-8",
-	);
-	cache.clear();
+  mkdirSync(GLOBAL_CONFIG_DIR, { recursive: true });
+  const current = loadJson(GLOBAL_SETTINGS_FILE) ?? {};
+  const updated = { ...current, ...settings };
+  writeFileSync(
+    GLOBAL_SETTINGS_FILE,
+    `${JSON.stringify(updated, null, 2)}\n`,
+    "utf-8",
+  );
+  cache.clear();
 }
 
 export function saveLocalSettings(
-	settings: Partial<PiGitSettings>,
-	cwd?: string,
+  settings: Partial<PiGitSettings>,
+  cwd?: string,
 ): void {
-	const localPath = getLocalSettingsPath(cwd);
-	if (!localPath) {
-		throw new Error("Not inside a git repository");
-	}
-	mkdirSync(dirname(localPath), { recursive: true });
-	const current = loadJson(localPath) ?? {};
-	const updated = { ...current, ...settings };
-	writeFileSync(
-		localPath,
-		JSON.stringify(updated, null, 2) + "\n",
-		"utf-8",
-	);
-	cache.clear();
-}
-
-/** Backward-compatible alias: writes to global settings. */
-export function saveSettings(settings: Partial<PiGitSettings>): void {
-	saveGlobalSettings(settings);
-}
-
-/** Backward-compatible alias. */
-export function setLanguage(lang: string): void {
-	saveGlobalSettings({ lang });
-}
-
-/** Backward-compatible alias. */
-export function setAutoAggCommit(enabled: boolean): void {
-	saveGlobalSettings({ auto_agg_commit: enabled });
+  const localPath = getLocalSettingsPath(cwd);
+  if (!localPath) {
+    throw new Error("Not inside a git repository");
+  }
+  mkdirSync(dirname(localPath), { recursive: true });
+  const current = loadJson(localPath) ?? {};
+  const updated = { ...current, ...settings };
+  writeFileSync(localPath, `${JSON.stringify(updated, null, 2)}\n`, "utf-8");
+  cache.clear();
 }
