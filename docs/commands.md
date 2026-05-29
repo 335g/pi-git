@@ -170,6 +170,81 @@ Project-specific overrides. Created automatically on the first `/git-config` wri
 
 ---
 
+## `/git-branch`
+
+Manage git branches: list, switch, create, and delete.
+
+### Usage
+
+```
+/git-branch                              # List all branches
+/git-branch <branch>                     # Switch to a branch
+/git-branch <branch> -c                  # Create and switch to a new branch
+/git-branch <branch> --create            # Same as -c
+/git-branch <branch> -d                  # Delete a branch (merged only)
+/git-branch <branch> --delete            # Same as -d
+/git-branch --list                       # List all branches
+/git-branch --help                       # Show help
+```
+
+### Flags
+
+| Flag | Description |
+|------|-------------|
+| `-c`, `--create` | Create a new branch and switch to it |
+| `-d`, `--delete` | Delete a branch (merged only) |
+| `--list`, `-l` | List all branches |
+| `--help`, `-h` | Show help message |
+
+### Behavior
+
+| Situation | Behavior |
+|-----------|----------|
+| No arguments | Lists all branches (local and remote) |
+| `--list` or `-l` | Lists all branches (local and remote) |
+| Branch name only | Switches to the specified branch |
+| `-c` with branch name | Creates a new branch from the current HEAD and switches to it |
+| `-d` with branch name | Prompts for confirmation, then deletes the branch (merged only) |
+| Deleting the current branch | Warns and aborts; switch to another branch first |
+| Not a git repository | Warns and aborts |
+
+### Branch Listing
+
+When listing branches, the output shows:
+
+- **Local branches** — prefixed with `*` for the current branch
+- **Remote branches** — listed separately (if any exist)
+
+### Examples
+
+```bash
+# List all branches
+/git-branch
+# → Local branches:
+# → * main
+# →   develop
+# →   feature/login
+#
+# → Remote branches:
+# →   origin/main
+# →   origin/develop
+
+# Switch to an existing branch
+/git-branch develop
+# → Switched to branch 'develop'
+
+# Create a new branch and switch to it
+/git-branch feature/new-api -c
+# → Created and switched to new branch 'feature/new-api'
+
+# Delete a branch
+/git-branch feature/old -d
+# → (confirmation prompt)
+# → Deleted branch 'feature/old'
+```
+
+---
+
 ## `/git-diff`
 
 Interactive diff review with AI-assisted hunk decomposition. Displays a side-by-side file tree and diff viewer, allowing you to review, adjust, and commit changes one logical hunk at a time.
