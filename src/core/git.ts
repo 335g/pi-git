@@ -187,7 +187,7 @@ export async function getLog(
   },
   cwd?: string,
 ): Promise<string> {
-  const args = ["log", "--oneline"];
+  const args = ["log", "--oneline", "--decorate", "--color=always"];
 
   if (options.maxCount !== "all" && options.maxCount !== undefined) {
     args.push(`-n`, String(options.maxCount));
