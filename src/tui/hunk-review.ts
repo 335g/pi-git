@@ -100,12 +100,22 @@ export class HunkReviewComponent implements Component {
     // Empty line
     this.container.addChild(new Text("", 0, 0));
 
-    // Help text
-    const help = this.theme.fg(
-      "muted",
-      "↑↓: navigate  Enter: view diff  a: approve  e: edit message  s: skip  x: exclude  q: quit",
-    );
-    this.container.addChild(new Text(help, 1, 0));
+    // Help text - keybindings
+    const helpLines = [
+      this.theme.fg("muted", "Navigation:"),
+      this.theme.fg("text", "  ↑↓        ") + this.theme.fg("muted", "Navigate files"),
+      this.theme.fg("text", "  Enter     ") + this.theme.fg("muted", "View diff"),
+      this.theme.fg("muted", "Actions:"),
+      this.theme.fg("text", "  a         ") + this.theme.fg("muted", "Approve & commit"),
+      this.theme.fg("text", "  e         ") + this.theme.fg("muted", "Edit message"),
+      this.theme.fg("text", "  x         ") + this.theme.fg("muted", "Exclude file"),
+      this.theme.fg("text", "  s         ") + this.theme.fg("muted", "Skip hunk"),
+      this.theme.fg("text", "  q         ") + this.theme.fg("muted", "Quit"),
+    ];
+
+    for (const line of helpLines) {
+      this.container.addChild(new Text(line, 1, 0));
+    }
 
     this.container.addChild(border);
   }
@@ -168,9 +178,18 @@ export class HunkReviewComponent implements Component {
     // Empty line
     this.container.addChild(new Text("", 0, 0));
 
-    // Help text
-    const help = this.theme.fg("muted", "↑↓: scroll  Esc: back to list");
-    this.container.addChild(new Text(help, 1, 0));
+    // Help text - keybindings
+    const helpLines = [
+      this.theme.fg("muted", "Navigation:"),
+      this.theme.fg("text", "  ↑↓        ") + this.theme.fg("muted", "Scroll line by line"),
+      this.theme.fg("text", "  Shift+↑↓  ") + this.theme.fg("muted", "Scroll ¾ page"),
+      this.theme.fg("text", "  Home/End  ") + this.theme.fg("muted", "Jump to top/bottom"),
+      this.theme.fg("text", "  Esc       ") + this.theme.fg("muted", "Back to file list"),
+    ];
+
+    for (const line of helpLines) {
+      this.container.addChild(new Text(line, 1, 0));
+    }
 
     this.container.addChild(border);
   }
@@ -286,6 +305,36 @@ export class HunkReviewComponent implements Component {
     } else if (matchesKey(data, Key.down)) {
       if (this.diffScrollOffset < diffLines.length - visibleLines) {
         this.diffScrollOffset++;
+        this.renderDiff();
+        this.tui.requestRender();
+      }
+    } else if (matchesKey(data, Key.shift("up"))) {
+      if (this.diffScrollOffset > 0) {
+        const jump = Math.floor(visibleLines * 3 / 4);
+        this.diffScrollOffset = Math.max(0, this.diffScrollOffset - jump);
+        this.renderDiff();
+        this.tui.requestRender();
+      }
+    } else if (matchesKey(data, Key.shift("down"))) {
+      if (this.diffScrollOffset < diffLines.length - visibleLines) {
+        const jump = Math.floor(visibleLines * 3 / 4);
+        this.diffScrollOffset = Math.min(
+          diffLines.length - visibleLines,
+          this.diffScrollOffset + jump,
+        );
+        this.renderDiff();
+        this.tui.requestRender();
+      }
+    } else if (matchesKey(data, Key.home)) {
+      if (this.diffScrollOffset > 0) {
+        this.diffScrollOffset = 0;
+        this.renderDiff();
+        this.tui.requestRender();
+      }
+    } else if (matchesKey(data, Key.end)) {
+      const maxOffset = Math.max(0, diffLines.length - visibleLines);
+      if (this.diffScrollOffset < maxOffset) {
+        this.diffScrollOffset = maxOffset;
         this.renderDiff();
         this.tui.requestRender();
       }
