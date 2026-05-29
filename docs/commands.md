@@ -304,6 +304,92 @@ The UI is an overlay with three areas:
 
 ---
 
+## `/git-log`
+
+Displays git log in oneline format with branch names, HEAD position, and optional graph visualization.
+
+### Usage
+
+```
+/git-log
+/git-log -n 50
+/git-log --all
+/git-log --graph
+/git-log -n 30 --all --graph
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `-n <count>` | Number of commits to display (default: 20, use `all` for unlimited) |
+| `--all` | Show commits from all branches |
+| `--graph` | Display ASCII graph showing branch and merge history |
+| `--help`, `-h` | Show help message |
+
+### Behavior
+
+| Situation | Behavior |
+|-----------|----------|
+| No options | Shows latest 20 commits from current branch |
+| `-n <count>` | Shows specified number of commits |
+| `-n all` | Shows all commits (no limit) |
+| `--all` | Includes commits from all branches (local and remote) |
+| `--graph` | Adds ASCII art showing branch topology |
+| Not a git repository | Warns and aborts |
+
+### Output Features
+
+The command uses git's built-in decoration and coloring:
+
+- **Branch names** — Displayed in parentheses next to commit hashes (e.g., `(HEAD -> main, origin/main)`)
+- **HEAD position** — Shows which branch HEAD points to (e.g., `HEAD -> feature-branch`)
+- **Remote branches** — Displayed with remote prefix (e.g., `origin/main`, `origin/develop`)
+- **Color coding** — git automatically applies colors (green for branches, blue for HEAD, red for remotes, etc.)
+
+### Examples
+
+```bash
+# Show latest 20 commits from current branch
+/git-log
+# → * abc1234 (HEAD -> main) feat: add new feature
+# → * def5678 fix: resolve bug
+# → * ghi9012 docs: update README
+
+# Show latest 50 commits
+/git-log -n 50
+
+# Show all commits (no limit)
+/git-log -n all
+
+# Show commits from all branches
+/git-log --all
+# → * abc1234 (HEAD -> feature-branch, origin/feature-branch) feat: add feature
+# → * def5678 (origin/main, main) fix: bug fix
+# → * ghi9012 (origin/develop) refactor: improve performance
+
+# Show with graph visualization
+/git-log --graph
+# → * abc1234 (HEAD -> main) feat: add new feature
+# → * def5678 fix: resolve bug
+# → | * ghi9012 (feature-branch) feat: work on feature
+# → | * jkl0123 feat: continue feature
+# → |/  
+# → * mno4567 docs: update README
+
+# Combine options
+/git-log -n 30 --all --graph
+```
+
+### Notes
+
+- Uses git's `--decorate` and `--color=always` options for enhanced output
+- The graph visualization shows branch and merge topology using ASCII art
+- Remote branch names help you see where remote branches are relative to your local branches
+- HEAD indicator shows which branch you're currently on
+
+---
+
 ## Environment & Concurrency
 
 - All commands that modify the working tree (`/git-agg-commit`) detect and prevent concurrent execution to avoid staging area conflicts.

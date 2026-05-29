@@ -31,6 +31,7 @@ pi install /path/to/pi-git
 | [`/git-config`](#git-config) | Get, set, or list pi-git configuration values |
 | [`/git-branch`](#git-branch) | Manage git branches: list, switch, create, and delete |
 | [`/git-diff`](#git-diff) | Interactively review AI-generated hunks and commit approved ones |
+| [`/git-log`](#git-log) | Display git log in oneline format |
 
 ### `/git-agg-commit`
 
@@ -70,6 +71,14 @@ Interactive diff review with AI-assisted hunk decomposition. Displays a file tre
 
 ```
 /git-diff [--lang=<code>]
+```
+
+### `/git-log`
+
+Displays git log in oneline format with branch names and HEAD position.
+
+```
+/git-log [-n <count>] [--all] [--graph]
 ```
 
 ---
