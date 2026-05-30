@@ -1,5 +1,5 @@
 {
-  "name": "pi-git",
+  "name": "@335g/pi-git",
   "version": "0.0.1",
   "description": "Git utilities extension for pi-coding-agent",
   "type": "module",
