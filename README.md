@@ -11,7 +11,7 @@ Provides slash commands to automate and streamline git workflows within pi.
 ### From npm (recommended)
 
 ```bash
-pi install pi-git
+pi install @335g/pi-git
 ```
 
 Or add to your project's package.json:
@@ -19,7 +19,7 @@ Or add to your project's package.json:
 ```json
 {
   "dependencies": {
-    "pi-git": "^0.0.1"
+    "@335g/pi-git": "^0.0.1"
   }
 }
 ```

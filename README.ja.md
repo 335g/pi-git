@@ -11,7 +11,7 @@ pi内でgitワークフローを自動化・効率化するスラッシュコマ
 ### npmから（推奨）
 
 ```bash
-pi install pi-git
+pi install @335g/pi-git
 ```
 
 または、プロジェクトのpackage.jsonに追加：
@@ -19,7 +19,7 @@ pi install pi-git
 ```json
 {
   "dependencies": {
-    "pi-git": "^0.0.1"
+    "@335g/pi-git": "^0.0.1"
   }
 }
 ```
