@@ -1,23 +1,60 @@
 {
   "name": "pi-git",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "Git utilities extension for pi-coding-agent",
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "README.ja.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
   "keywords": [
-    "pi-package"
+    "pi-package",
+    "pi-extension",
+    "git",
+    "conventional-commits",
+    "automation"
   ],
   "author": "Yoshiki Kudo",
   "license": "MIT",
-  "main": "./src/index.ts",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/335g/pi-git.git"
+  },
+  "bugs": {
+    "url": "https://github.com/335g/pi-git/issues"
+  },
+  "homepage": "https://github.com/335g/pi-git#readme",
   "pi": {
     "extensions": [
-      "./src/index.ts"
+      "./dist/index.js"
     ]
   },
   "devDependencies": {
-    "@types/node": "^25.9.1"
+    "@earendil-works/pi-tui": "^0.78.0",
+    "@types/node": "^25.9.1",
+    "typescript": "^5.9.0"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
-    "@earendil-works/pi-coding-agent": "*"
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  },
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-tui": {
+      "optional": true
+    }
   }
 }

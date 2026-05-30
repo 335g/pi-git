@@ -8,13 +8,29 @@ pi内でgitワークフローを自動化・効率化するスラッシュコマ
 
 ## インストール
 
-### ローカル拡張機能として
+### npmから（推奨）
+
+```bash
+pi install pi-git
+```
+
+または、プロジェクトのpackage.jsonに追加：
+
+```json
+{
+  "dependencies": {
+    "pi-git": "^0.0.1"
+  }
+}
+```
+
+### ローカル拡張機能として（開発用）
 
 ```bash
 pi -e ./src/index.ts
 ```
 
-### piパッケージとして
+### ローカルパッケージから（開発用）
 
 ```bash
 pi install /path/to/pi-git

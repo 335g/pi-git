@@ -8,13 +8,29 @@ Provides slash commands to automate and streamline git workflows within pi.
 
 ## Installation
 
-### As a local extension
+### From npm (recommended)
+
+```bash
+pi install pi-git
+```
+
+Or add to your project's package.json:
+
+```json
+{
+  "dependencies": {
+    "pi-git": "^0.0.1"
+  }
+}
+```
+
+### As a local extension (development)
 
 ```bash
 pi -e ./src/index.ts
 ```
 
-### As a pi package
+### From local package (development)
 
 ```bash
 pi install /path/to/pi-git
