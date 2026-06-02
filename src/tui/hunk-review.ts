@@ -104,22 +104,16 @@ export class HunkReviewComponent implements Component {
     // Empty line
     this.container.addChild(new Text("", 0, 0));
 
-    // Help text - keybindings
-    const helpLines = [
-      this.theme.fg("muted", "Navigation:"),
-      this.theme.fg("text", "  ↑↓        ") + this.theme.fg("muted", "Navigate files"),
-      this.theme.fg("text", "  Enter     ") + this.theme.fg("muted", "View diff"),
-      this.theme.fg("muted", "Actions:"),
-      this.theme.fg("text", "  a         ") + this.theme.fg("muted", "Approve & commit"),
-      this.theme.fg("text", "  e         ") + this.theme.fg("muted", "Edit message"),
-      this.theme.fg("text", "  x         ") + this.theme.fg("muted", "Exclude file"),
-      this.theme.fg("text", "  s         ") + this.theme.fg("muted", "Skip hunk"),
-      this.theme.fg("text", "  q         ") + this.theme.fg("muted", "Quit"),
-    ];
-
-    for (const line of helpLines) {
-      this.container.addChild(new Text(line, 1, 0));
-    }
+    // Help text - compact single line
+    const helpLine =
+      this.theme.fg("dim", "↑↓ navigate  ") +
+      this.theme.fg("dim", "Enter diff  ") +
+      this.theme.fg("dim", "a: approve  ") +
+      this.theme.fg("dim", "e: edit  ") +
+      this.theme.fg("dim", "x: exclude  ") +
+      this.theme.fg("dim", "s: skip  ") +
+      this.theme.fg("dim", "q: quit");
+    this.container.addChild(new Text(helpLine, 1, 0));
 
     this.container.addChild(border);
   }
