@@ -17,55 +17,46 @@ import { getLanguage } from "../utils/settings.js";
 import { sanitizeHunk } from "./commit-message.js";
 import { resolveModel } from "./resolve-model.js";
 
+/** Maximum diff bytes to send to the AI (truncated if larger) */
+const MAX_DIFF_BYTES = 30_000;
+
+/** Files threshold: skip AI analysis when ≤ this many files changed */
+const FAST_PATH_FILE_LIMIT = 3;
+
 function getSystemPrompt(lang: string): string {
   if (isJapanese(lang)) {
-    return `あなたはgit diff解析ツールです。git diffを分析し、変更を論理的なhunkに分割してください。
+    return `git diffを論理的なhunkに分割してください。
 
 ルール:
-- 各hunkは単一の論理的な変更を表す（例：「機能Xを追加」「バグYを修正」「Zをリファクタリング」）
-- 同じ論理的な変更に属するファイル変更はグループ化する
-- 1つのファイルに複数の独立した変更が含まれる場合は、別々のhunkに分割する
-- 新規ファイルの場合は、内容から論理的な目的を推定する
+- 各hunk = 単一の論理的な変更（例：「機能Xを追加」「バグYを修正」）
+- 関連するファイル変更はグループ化する
+- 1ファイルに独立した複数の変更がある場合は分割する
 
-各hunkに対して以下を提供してください:
-- files: このhunkに含まれるファイルパスの配列
-- message: Conventional Commits形式のメッセージ。typeは feat, fix, docs, style, refactor, test, chore から選択
-  - サブジェクトは50文字以内に収める
-  - 命令形を使用する（例：「追加」でなく「追加する」→英語のimperative moodに相当する日本語表現）
-  - スコープはリポジトリの文脈から明確に推定できる場合のみ含める
-  - 日本語でメッセージを記述する
-
-以下の形式のJSON配列のみを返してください。マークダウンのコードフェンスや追加のテキストは不要です:
+以下のJSON配列のみを返してください:
 [
-  {
-    "files": ["path/to/file1.ts", "path/to/file2.ts"],
-    "message": "feat: ユーザー認証機能を追加"
-  }
-]`;
+  {"files": ["path/to/file1.ts", "path/to/file2.ts"], "message": "feat: 機能を追加"},
+  {"files": ["path/to/file3.ts"], "message": "fix: バグを修正"}
+]
+
+メッセージ形式: Conventional Commits (feat, fix, docs, style, refactor, test, chore)。
+サブジェクトは50文字以内。日本語で記述。`;
   }
 
-  return `You are a git diff analyzer. Your task is to analyze a git diff and split the changes into logical hunks.
+  return `Split git diff into logical hunks.
 
 Rules:
-- Each hunk should represent a single logical change (e.g., "add feature X", "fix bug Y", "refactor Z")
-- Group related file changes together if they belong to the same logical change
-- If a single file contains multiple independent changes, split them into separate hunks
-- For new files, infer the logical purpose from the content
+- Each hunk = single logical change (e.g., "add feature X", "fix bug Y")
+- Group related file changes together
+- Split independent changes within one file into separate hunks
 
-For each hunk, provide:
-- files: array of file paths included in this hunk
-- message: a Conventional Commits style message. Choose type from: feat, fix, docs, style, refactor, test, chore
-  - Keep the subject under 50 characters
-  - Use imperative mood (e.g., "add" not "added")
-  - Include scope only if clearly inferable from the repository context
-
-Return ONLY a JSON array in this exact format, with no markdown code fences or additional text:
+Return ONLY a JSON array:
 [
-  {
-    "files": ["path/to/file1.ts", "path/to/file2.ts"],
-    "message": "feat(scope): add user authentication"
-  }
-]`;
+  {"files": ["path/to/file1.ts", "path/to/file2.ts"], "message": "feat(scope): add feature"},
+  {"files": ["path/to/file3.ts"], "message": "fix: resolve null check"}
+]
+
+Message format: Conventional Commits (feat, fix, docs, style, refactor, test, chore).
+Keep subject under 50 chars. Use imperative mood.`;
 }
 
 function buildPrompt(diff: string, lang: string): string {
@@ -137,11 +128,30 @@ function fallbackFileBasedHunks(diff: string): Hunk[] {
   return hunks;
 }
 
+/** Count files in a diff by counting "diff --git" headers */
+function countFilesInDiff(diff: string): number {
+  const matches = diff.match(/^diff --git/gm);
+  return matches ? matches.length : 0;
+}
+
+/** Truncate oversized diff at a clean line break */
+function truncateDiff(diff: string, maxBytes: number): string {
+  if (diff.length <= maxBytes) return diff;
+  const slice = diff.substring(0, maxBytes);
+  const lastNewline = slice.lastIndexOf("\n");
+  return lastNewline > 0 ? slice.substring(0, lastNewline) : slice;
+}
+
 export async function analyzeDiff(
   _pi: ExtensionAPI,
   ctx: ExtensionContext,
   diff: string,
 ): Promise<Hunk[]> {
+  // Fast path: few files → instant fallback, skip AI call entirely
+  if (countFilesInDiff(diff) <= FAST_PATH_FILE_LIMIT) {
+    return fallbackFileBasedHunks(diff);
+  }
+
   const model = resolveModel(ctx);
   if (!model) {
     return fallbackFileBasedHunks(diff);
@@ -152,6 +162,9 @@ export async function analyzeDiff(
     return fallbackFileBasedHunks(diff);
   }
 
+  // Truncate oversized diffs to avoid slow inference on huge payloads
+  const analysisDiff = truncateDiff(diff, MAX_DIFF_BYTES);
+
   try {
     const lang = getLanguage();
     const context: Context = {
@@ -159,7 +172,7 @@ export async function analyzeDiff(
       messages: [
         {
           role: "user",
-          content: buildPrompt(diff, lang),
+          content: buildPrompt(analysisDiff, lang),
           timestamp: Date.now(),
         },
       ],

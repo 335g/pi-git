@@ -32,6 +32,16 @@ export class HunkReviewComponent implements Component {
   private mode: "list" | "diff" = "list";
   private diffScrollOffset = 0;
 
+  /** Calculate visible lines available for diff content based on terminal height */
+  private getVisibleLines(): number {
+    // Fixed lines in diff mode:
+    //   1 top border + 1 header + 1 status/scroll line
+    //   + 1 help line + 1 bottom border
+    const fixedLines = 5;
+    const terminalRows = this.tui.terminal?.rows ?? 24;
+    return Math.max(5, terminalRows - fixedLines);
+  }
+
   constructor(
     private hunk: Hunk,
     private hunkIndex: number,
@@ -130,18 +140,14 @@ export class HunkReviewComponent implements Component {
     const border = new DynamicBorder((s: string) => this.theme.fg("border", s));
     this.container.addChild(border);
 
-    // Header
+    // Header + diff content (no empty line separator for maximum space)
     const header = this.theme.fg(
       "accent",
       this.theme.bold(`Diff: ${file}`),
     );
     this.container.addChild(new Text(header, 1, 0));
 
-    // Empty line
-    this.container.addChild(new Text("", 0, 0));
-
-    // Diff content (with scrolling)
-    const visibleLines = 20; // TODO: calculate from terminal height
+    const visibleLines = this.getVisibleLines();
     const start = this.diffScrollOffset;
     const end = Math.min(start + visibleLines, diffLines.length);
 
@@ -160,30 +166,24 @@ export class HunkReviewComponent implements Component {
       this.container.addChild(new Text(colored, 1, 0));
     }
 
-    // Scroll indicator
+    // Status line: scroll indicator or empty (always present for stable layout)
     if (diffLines.length > visibleLines) {
       const scrollInfo = this.theme.fg(
         "muted",
         `Lines ${start + 1}-${end} of ${diffLines.length}`,
       );
       this.container.addChild(new Text(scrollInfo, 1, 0));
+    } else {
+      this.container.addChild(new Text("", 0, 0));
     }
 
-    // Empty line
-    this.container.addChild(new Text("", 0, 0));
-
-    // Help text - keybindings
-    const helpLines = [
-      this.theme.fg("muted", "Navigation:"),
-      this.theme.fg("text", "  ↑↓        ") + this.theme.fg("muted", "Scroll line by line"),
-      this.theme.fg("text", "  Shift+↑↓  ") + this.theme.fg("muted", "Scroll ¾ page"),
-      this.theme.fg("text", "  Home/End  ") + this.theme.fg("muted", "Jump to top/bottom"),
-      this.theme.fg("text", "  Esc       ") + this.theme.fg("muted", "Back to file list"),
-    ];
-
-    for (const line of helpLines) {
-      this.container.addChild(new Text(line, 1, 0));
-    }
+    // Help text - compact single line
+    const helpLine =
+      this.theme.fg("dim", "↑↓ scroll  ") +
+      this.theme.fg("dim", "Shift+↑↓ ¾ pg  ") +
+      this.theme.fg("dim", "Home/End jump  ") +
+      this.theme.fg("dim", "Esc back");
+    this.container.addChild(new Text(helpLine, 1, 0));
 
     this.container.addChild(border);
   }
@@ -288,7 +288,7 @@ export class HunkReviewComponent implements Component {
     }
 
     const diffLines = this.fileDiffs.get(file) || [];
-    const visibleLines = 20;
+    const visibleLines = this.getVisibleLines();
 
     if (matchesKey(data, Key.up)) {
       if (this.diffScrollOffset > 0) {
