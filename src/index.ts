@@ -8,10 +8,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { AgentEndEvent } from "./types.js";
 import { handleAggCommit } from "./commands/agg-commit.js";
 import { handleAutoAggCommit } from "./commands/auto-agg-commit.js";
-import { handleBranch } from "./commands/branch.js";
 import { handleConfig } from "./commands/config.js";
-import { handleGitDiff } from "./commands/git-diff.js";
-import { handleGitLog } from "./commands/git-log.js";
 import { handleAutoCommit } from "./core/auto-commit.js";
 import { footerManager } from "./utils/footer-manager.js";
 
@@ -42,28 +39,6 @@ export default function (pi: ExtensionAPI) {
     description: "Toggle automatic git-agg-commit after assistant responses",
     handler: async (args, ctx) => {
       await handleAutoAggCommit(pi, ctx, args);
-    },
-  });
-
-  pi.registerCommand("git-branch", {
-    description: "Manage git branches: list, switch, create, and delete",
-    handler: async (args, ctx) => {
-      await handleBranch(pi, ctx, args);
-    },
-  });
-
-  pi.registerCommand("git-diff", {
-    description:
-      "Interactively review AI-generated hunks and commit approved ones",
-    handler: async (args, ctx) => {
-      await handleGitDiff(pi, ctx, args);
-    },
-  });
-
-  pi.registerCommand("git-log", {
-    description: "Display git log in oneline format",
-    handler: async (args, ctx) => {
-      await handleGitLog(pi, ctx, args);
     },
   });
 

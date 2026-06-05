@@ -7,8 +7,6 @@ export interface Hunk {
   files: string[];
   /** Conventional Commit message for this hunk */
   message: string;
-  /** Optional description of changes for message generation context */
-  description?: string;
 }
 
 export interface FileStats {
