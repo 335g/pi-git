@@ -13,7 +13,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import type { FileStats, Hunk } from "../types.js";
 import { footerManager } from "../utils/footer-manager.js";
-import { isJapanese } from "../utils/lang.js";
+import { t } from "../utils/lang.js";
 import { getLanguage } from "../utils/settings.js";
 import { sanitizeHunk } from "./commit-message.js";
 import { resolveModel } from "./resolve-model.js";
@@ -31,8 +31,8 @@ const FILES_PER_BATCH = 8;
 const MAX_OUTPUT_TOKENS = 1024;
 
 function getSystemPrompt(lang: string): string {
-  if (isJapanese(lang)) {
-    return `git diffを論理的なhunkに分割してください。
+  return t(lang,
+    `git diffを論理的なhunkに分割してください。
 
 ルール:
 - 各hunk = 単一の論理的な変更（例：「機能Xを追加」「バグYを修正」）
@@ -46,10 +46,8 @@ function getSystemPrompt(lang: string): string {
 ]
 
 メッセージ形式: Conventional Commits (feat, fix, docs, style, refactor, test, chore)。
-サブジェクトは50文字以内。日本語で記述。`;
-  }
-
-  return `Split git diff into logical hunks.
+サブジェクトは50文字以内。日本語で記述。`,
+    `Split git diff into logical hunks.
 
 Rules:
 - Each hunk = single logical change (e.g., "add feature X", "fix bug Y")
@@ -63,27 +61,27 @@ Return ONLY a JSON array:
 ]
 
 Message format: Conventional Commits (feat, fix, docs, style, refactor, test, chore).
-Keep subject under 50 chars. Use imperative mood.`;
+Keep subject under 50 chars. Use imperative mood.`,
+  );
 }
 
 function buildPrompt(diff: string, lang: string): string {
-  if (isJapanese(lang)) {
-    return `以下のgit diffを分析し、論理的なhunkに分割してください:
+  return t(lang,
+    `以下のgit diffを分析し、論理的なhunkに分割してください:
 
 \`\`\`diff
 ${diff}
 \`\`\`
 
-指定された形式のJSON配列のみを返してください。`;
-  }
-
-  return `Here is the git diff to analyze. Split it into logical hunks:
+指定された形式のJSON配列のみを返してください。`,
+    `Here is the git diff to analyze. Split it into logical hunks:
 
 \`\`\`diff
 ${diff}
 \`\`\`
 
-Respond with ONLY a JSON array of hunks as specified.`;
+Respond with ONLY a JSON array of hunks as specified.`,
+  );
 }
 
 function parseHunks(text: string): Hunk[] {
@@ -362,7 +360,7 @@ export function processHunks(hunks: Hunk[]): Hunk[] {
 /**
  * Split a full diff into per-file diff line arrays, keyed by file path.
  */
-export function splitDiffByFile(fullDiff: string): Map<string, string[]> {
+function splitDiffByFile(fullDiff: string): Map<string, string[]> {
   const result = new Map<string, string[]>();
   const lines = fullDiff.split("\n");
   let currentFile: string | null = null;
@@ -393,7 +391,7 @@ export function splitDiffByFile(fullDiff: string): Map<string, string[]> {
 /**
  * Parse addition/deletion counts for each file from a full diff.
  */
-export function parseDiffStats(fullDiff: string): Map<string, FileStats> {
+function parseDiffStats(fullDiff: string): Map<string, FileStats> {
   const result = new Map<string, FileStats>();
   const lines = fullDiff.split("\n");
   let currentFile: string | null = null;

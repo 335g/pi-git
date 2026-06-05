@@ -12,7 +12,7 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
-import { isJapanese } from "../utils/lang.js";
+import { t } from "../utils/lang.js";
 import { getLanguage } from "../utils/settings.js";
 import { sanitizeCommitMessage } from "./commit-message.js";
 import { resolveModel } from "./resolve-model.js";
@@ -23,8 +23,8 @@ interface SimpleMessage {
 }
 
 function getSystemPrompt(lang: string): string {
-  if (isJapanese(lang)) {
-    return `あなたはコミットメッセージ生成ツールです。ユーザーのリクエストとアシスタントの応答内容から、変更の意図を推測して Conventional Commit メッセージを1つ生成してください。
+  return t(lang,
+    `あなたはコミットメッセージ生成ツールです。ユーザーのリクエストとアシスタントの応答内容から、変更の意図を推測して Conventional Commit メッセージを1つ生成してください。
 
 ルール:
 - type は feat, fix, docs, style, refactor, test, chore から選択
@@ -33,10 +33,8 @@ function getSystemPrompt(lang: string): string {
 - スコープは推測できる場合のみ含める
 - 日本語で記述
 
-返答はメッセージ文字列のみ。説明やコードフェンスは不要。`;
-  }
-
-  return `You are a commit message generator. Based on the user's request and the assistant's response, infer the intent of the changes and generate a single Conventional Commit message.
+返答はメッセージ文字列のみ。説明やコードフェンスは不要。`,
+    `You are a commit message generator. Based on the user's request and the assistant's response, infer the intent of the changes and generate a single Conventional Commit message.
 
 Rules:
 - Choose type from: feat, fix, docs, style, refactor, test, chore
@@ -44,7 +42,8 @@ Rules:
 - Use imperative mood
 - Include scope only if clearly inferable
 
-Return ONLY the commit message string. No explanations or code fences.`;
+Return ONLY the commit message string. No explanations or code fences.`,
+  );
 }
 
 function extractTextContent(content: string | unknown): string {
@@ -80,8 +79,8 @@ function buildPrompt(
   lang: string,
 ): string {
   const filesStr = changedFiles.join(", ");
-  if (isJapanese(lang)) {
-    return `ユーザーのリクエスト:
+  return t(lang,
+    `ユーザーのリクエスト:
 ${lastUserMessage}
 
 アシスタントの応答:
@@ -89,10 +88,8 @@ ${lastAssistantMessage}
 
 変更されたファイル: ${filesStr}
 
-上記から変更の意図を推測し、Conventional Commit メッセージを1つ生成してください。`;
-  }
-
-  return `User request:
+上記から変更の意図を推測し、Conventional Commit メッセージを1つ生成してください。`,
+    `User request:
 ${lastUserMessage}
 
 Assistant response:
@@ -100,7 +97,8 @@ ${lastAssistantMessage}
 
 Changed files: ${filesStr}
 
-Based on the above, infer the intent of the changes and generate a single Conventional Commit message.`;
+Based on the above, infer the intent of the changes and generate a single Conventional Commit message.`,
+  );
 }
 
 export async function generateAutoCommitMessage(

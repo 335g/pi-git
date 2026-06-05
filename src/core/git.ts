@@ -74,90 +74,6 @@ export async function resetStaging(
   }
 }
 
-export async function getCurrentBranch(
-  pi: ExtensionAPI,
-  cwd?: string,
-): Promise<string> {
-  const { stdout, code } = await pi.exec("git", ["branch", "--show-current"], {
-    cwd,
-  });
-  if (code !== 0) {
-    throw new GitError(
-      "Failed to get current branch",
-      "git branch --show-current",
-      code,
-    );
-  }
-  return stdout.trim();
-}
-
-export async function getBranches(
-  pi: ExtensionAPI,
-  cwd?: string,
-): Promise<{ name: string; isRemote: boolean }[]> {
-  const { stdout, code } = await pi.exec(
-    "git",
-    ["branch", "-a", "--format=%(refname:short)"],
-    { cwd },
-  );
-  if (code !== 0) {
-    throw new GitError("Failed to get branches", "git branch -a", code);
-  }
-  return stdout
-    .split("\n")
-    .filter((line) => line.trim())
-    .map((name) => ({
-      name: name.trim(),
-      isRemote: name.startsWith("origin/"),
-    }));
-}
-
-export async function switchBranch(
-  pi: ExtensionAPI,
-  branch: string,
-  cwd?: string,
-): Promise<{ success: boolean; message: string }> {
-  const { stdout, stderr, code } = await pi.exec("git", ["switch", branch], {
-    cwd,
-  });
-  if (code !== 0) {
-    return { success: false, message: stderr || stdout };
-  }
-  return { success: true, message: stdout };
-}
-
-export async function createAndSwitchBranch(
-  pi: ExtensionAPI,
-  branch: string,
-  cwd?: string,
-): Promise<{ success: boolean; message: string }> {
-  const { stdout, stderr, code } = await pi.exec(
-    "git",
-    ["switch", "-c", branch],
-    { cwd },
-  );
-  if (code !== 0) {
-    return { success: false, message: stderr || stdout };
-  }
-  return { success: true, message: stdout };
-}
-
-export async function deleteBranch(
-  pi: ExtensionAPI,
-  branch: string,
-  cwd?: string,
-): Promise<{ success: boolean; message: string }> {
-  const { stdout, stderr, code } = await pi.exec(
-    "git",
-    ["branch", "-d", branch],
-    { cwd },
-  );
-  if (code !== 0) {
-    return { success: false, message: stderr || stdout };
-  }
-  return { success: true, message: stdout };
-}
-
 /**
  * Check that the working directory is a git repository with pending changes.
  * Returns null if ready, or a failure reason string.
@@ -173,39 +89,6 @@ export async function ensureReadyToCommit(
     return "no_changes";
   }
   return null;
-}
-
-/**
- * Get git log with specified options
- */
-export async function getLog(
-  pi: ExtensionAPI,
-  options: {
-    maxCount?: number | "all";
-    all?: boolean;
-    graph?: boolean;
-  },
-  cwd?: string,
-): Promise<string> {
-  const args = ["log", "--oneline", "--decorate", "--color=always"];
-
-  if (options.maxCount !== "all" && options.maxCount !== undefined) {
-    args.push(`-n`, String(options.maxCount));
-  }
-
-  if (options.all) {
-    args.push("--all");
-  }
-
-  if (options.graph) {
-    args.push("--graph");
-  }
-
-  const { stdout, code } = await pi.exec("git", args, { cwd });
-  if (code !== 0) {
-    throw new GitError("Failed to get git log", `git ${args.join(" ")}`, code);
-  }
-  return stdout;
 }
 
 /**
