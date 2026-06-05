@@ -9,39 +9,17 @@ import type {
   ExtensionAPI,
   ExtensionCommandContext,
 } from "@earendil-works/pi-coding-agent";
-import { isJapanese } from "../utils/lang.js";
+import { t } from "../utils/lang.js";
 import {
   getAutoAggCommit,
+  getLanguage,
   getLocalSettingsPath,
-  getSettings,
   saveGlobalSettings,
   saveLocalSettings,
 } from "../utils/settings.js";
 import { footerManager } from "../utils/footer-manager.js";
 
-function getStatusMessage(enabled: boolean, lang: string): string {
-  const ja = isJapanese(lang);
-  if (enabled) {
-    return ja
-      ? "[pi-git] 自動 git-agg-commit は有効です"
-      : "[pi-git] Auto git-agg-commit is enabled";
-  }
-  return ja
-    ? "[pi-git] 自動 git-agg-commit は無効です"
-    : "[pi-git] Auto git-agg-commit is disabled";
-}
-
-function _getToggledMessage(enabled: boolean, lang: string): string {
-  const ja = isJapanese(lang);
-  if (enabled) {
-    return ja
-      ? "[pi-git] 自動 git-agg-commit を有効にしました"
-      : "[pi-git] Auto git-agg-commit enabled";
-  }
-  return ja
-    ? "[pi-git] 自動 git-agg-commit を無効にしました"
-    : "[pi-git] Auto git-agg-commit disabled";
-}
+const P = "[pi-git]";
 
 export async function handleAutoAggCommit(
   pi: ExtensionAPI,
@@ -54,12 +32,12 @@ export async function handleAutoAggCommit(
 
   const trimmed = args.trim().toLowerCase();
   const current = getAutoAggCommit();
-  const lang = getSettings(ctx.cwd).lang ?? "en";
+  const lang = getLanguage(ctx.cwd);
 
   if (trimmed === "--help") {
-    const ja = isJapanese(lang);
-    const lines = ja
-      ? [
+    ctx.ui.notify(
+      t(lang,
+        [
           "/git-auto-agg-commit [on|off|toggle] [--help]",
           "",
           "サブコマンド:",
@@ -71,8 +49,8 @@ export async function handleAutoAggCommit(
           "  --help  このヘルプを表示",
           "",
           "引数を省略すると、現在の状態を表示します。",
-        ]
-      : [
+        ].join("\n"),
+        [
           "/git-auto-agg-commit [on|off|toggle] [--help]",
           "",
           "Subcommands:",
@@ -84,8 +62,10 @@ export async function handleAutoAggCommit(
           "  --help  Show this help message",
           "",
           "When called without arguments, shows the current status.",
-        ];
-    ctx.ui.notify(lines.join("\n"), "info");
+        ].join("\n"),
+      ),
+      "info",
+    );
     return;
   }
 
@@ -101,18 +81,23 @@ export async function handleAutoAggCommit(
       next = !current;
       break;
     case "":
-      ctx.ui.notify(getStatusMessage(current, lang), "info");
-      return;
-    default: {
-      const ja = isJapanese(lang);
       ctx.ui.notify(
-        ja
-          ? "[pi-git] 引数が不正です。on, off, toggle のいずれかを指定してください"
-          : '[pi-git] Invalid argument. Use "on", "off", or "toggle"',
+        t(lang,
+          `${P} 自動 git-agg-commit は${current ? "有効" : "無効"}です`,
+          `${P} Auto git-agg-commit is ${current ? "enabled" : "disabled"}`,
+        ),
+        "info",
+      );
+      return;
+    default:
+      ctx.ui.notify(
+        t(lang,
+          `${P} 引数が不正です。on, off, toggle のいずれかを指定してください`,
+          `${P} Invalid argument. Use "on", "off", or "toggle"`,
+        ),
         "warning",
       );
       return;
-    }
   }
 
   const localPath = getLocalSettingsPath(ctx.cwd);
@@ -124,19 +109,22 @@ export async function handleAutoAggCommit(
 
   await footerManager.refresh();
 
-  const ja = isJapanese(lang);
+  const enabledJa = next ? "有効" : "無効";
+  const enabledEn = next ? "enabled" : "disabled";
   if (localPath) {
     ctx.ui.notify(
-      ja
-        ? `[pi-git] 自動 git-agg-commit を${next ? "有効" : "無効"}にしました（ローカル設定）`
-        : `[pi-git] Auto git-agg-commit ${next ? "enabled" : "disabled"} (local config)`,
+      t(lang,
+        `${P} 自動 git-agg-commit を${enabledJa}にしました（ローカル設定）`,
+        `${P} Auto git-agg-commit ${enabledEn} (local config)`,
+      ),
       "info",
     );
   } else {
     ctx.ui.notify(
-      ja
-        ? `[pi-git] 自動 git-agg-commit を${next ? "有効" : "無効"}にしました（グローバル設定 — Gitリポジトリ外のため）`
-        : `[pi-git] Auto git-agg-commit ${next ? "enabled" : "disabled"} (global config — outside git repo)`,
+      t(lang,
+        `${P} 自動 git-agg-commit を${enabledJa}にしました（グローバル設定 — Gitリポジトリ外のため）`,
+        `${P} Auto git-agg-commit ${enabledEn} (global config — outside git repo)`,
+      ),
       "info",
     );
   }

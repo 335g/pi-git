@@ -16,7 +16,7 @@ import {
   resetStaging,
   stageFiles,
 } from "../core/git.js";
-import { isJapanese } from "../utils/lang.js";
+import { t } from "../utils/lang.js";
 import { getLanguage } from "../utils/settings.js";
 import { footerManager } from "../utils/footer-manager.js";
 
@@ -31,35 +31,36 @@ export async function handleAggCommit(
   args: string,
 ): Promise<void> {
   const lang = getLanguage(ctx.cwd);
-  const ja = isJapanese(lang);
 
   if (/--help/.test(args)) {
-    const lines = ja
-      ? [
-          "/git-agg-commit [--lang=<lang>] [--help]",
-          "",
-          "オプション:",
-          "  --lang=<lang>  一時的に言語を上書き（保存されません）",
-          "  --help         このヘルプを表示",
-        ]
-      : [
-          "/git-agg-commit [--lang=<lang>] [--help]",
-          "",
-          "Options:",
-          "  --lang=<lang>  Temporarily override language (not saved)",
-          "  --help         Show this help message",
-        ];
     if (ctx.hasUI) {
-      ctx.ui.notify(lines.join("\n"), "info");
+      ctx.ui.notify(
+        t(lang,
+          [
+            "/git-agg-commit [--lang=<lang>] [--help]",
+            "",
+            "オプション:",
+            "  --lang=<lang>  一時的に言語を上書き（保存されません）",
+            "  --help         このヘルプを表示",
+          ].join("\n"),
+          [
+            "/git-agg-commit [--lang=<lang>] [--help]",
+            "",
+            "Options:",
+            "  --lang=<lang>  Temporarily override language (not saved)",
+            "  --help         Show this help message",
+          ].join("\n"),
+        ),
+        "info",
+      );
     }
     return;
   }
 
   // Parse language argument (temporary override, does not save)
   const langArg = parseLangArg(args);
-  let runLang = lang;
+  const runLang = langArg ?? lang;
   if (langArg) {
-    runLang = langArg;
     ctx.ui.notify(`Language set to: ${langArg} (this run only)`, "info");
   }
 
@@ -69,9 +70,10 @@ export async function handleAggCommit(
 
   if (footerManager.isRunning()) {
     ctx.ui.notify(
-      isJapanese(runLang)
-        ? "git-agg-commit 実行中です。完了してから再度実行してください。"
-        : "git-agg-commit is already running. Please wait for it to complete.",
+      t(runLang,
+        "git-agg-commit 実行中です。完了してから再度実行してください。",
+        "git-agg-commit is already running. Please wait for it to complete.",
+      ),
       "warning",
     );
     return;
