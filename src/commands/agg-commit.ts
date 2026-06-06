@@ -70,12 +70,13 @@ export async function handleAggCommit(
 
     const preCheck = await ensureReadyToCommit(pi, ctx.cwd);
     if (preCheck) {
-      ctx.ui.notify(
-        preCheck === "not_git_repo"
-          ? "Not a git repository"
-          : "No changes to commit",
-        preCheck === "not_git_repo" ? "warning" : "info",
-      );
+      const messages: Record<string, { text: string; level: "warning" | "info" | "error" }> = {
+        not_git_repo: { text: "Not a git repository", level: "warning" },
+        merge_conflict: { text: "Merge conflicts detected. Resolve conflicts before committing.", level: "error" },
+        no_changes: { text: "No changes to commit", level: "info" },
+      };
+      const entry = messages[preCheck];
+      ctx.ui.notify(entry.text, entry.level);
       return;
     }
 

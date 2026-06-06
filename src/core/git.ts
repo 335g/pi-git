@@ -40,6 +40,21 @@ export async function getStatus(
   return stdout;
 }
 
+/** Unmerged path status codes in git status --porcelain XY format */
+const UNMERGED_CODES = ["DD", "AU", "UD", "UA", "DU", "AA", "UU"];
+
+/** Check for unmerged paths (merge conflicts) */
+export async function hasUnmergedPaths(
+  pi: ExtensionAPI,
+  cwd?: string,
+): Promise<boolean> {
+  const status = await getStatus(pi, cwd);
+  return status.split("\n").some((line) => {
+    const xy = line.substring(0, 2);
+    return UNMERGED_CODES.includes(xy);
+  });
+}
+
 export async function hasChanges(
   pi: ExtensionAPI,
   cwd?: string,
@@ -81,9 +96,12 @@ export async function resetStaging(
 export async function ensureReadyToCommit(
   pi: ExtensionAPI,
   cwd?: string,
-): Promise<"not_git_repo" | "no_changes" | null> {
+): Promise<"not_git_repo" | "merge_conflict" | "no_changes" | null> {
   if (!(await isGitRepository(pi, cwd))) {
     return "not_git_repo";
+  }
+  if (await hasUnmergedPaths(pi, cwd)) {
+    return "merge_conflict";
   }
   if (!(await hasChanges(pi, cwd))) {
     return "no_changes";
