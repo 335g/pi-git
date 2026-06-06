@@ -91,7 +91,7 @@ Get, set, or list `pi-git` configuration values. Supports both global and local 
 
 1. **Local config** — `<repo-root>/.pi-git/settings.json` (highest priority)
 2. **Global config** — `~/.config/pi-git/settings.json`
-3. **Built-in defaults** — `{"lang": "en", "autoAggCommit": false}` (lowest priority)
+3. **Built-in defaults** — `{"lang": "en", "auto_agg_commit": false}` (lowest priority)
 
 Values from local config take precedence over global config. If a key is missing in local config, the global value (or default) is used.
 
@@ -100,7 +100,7 @@ Values from local config take precedence over global config. If a key is missing
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `lang` | `string` | `"en"` | Display and commit message language. `"en"` or `"ja"`. |
-| `autoAggCommit` | `boolean` | `false` | Whether to automatically run `git-agg-commit` after assistant responses. |
+| `auto_agg_commit` | `boolean` | `false` | Whether to automatically run `git-agg-commit` after assistant responses. |
 
 ### Usage
 
@@ -147,7 +147,7 @@ Values from local config take precedence over global config. If a key is missing
 # List all settings with where they come from
 /git-config --list --show-origin
 # → lang=ja (local)
-# → autoAggCommit=false (default)
+# → auto_agg_commit=false (default)
 ```
 
 ---
