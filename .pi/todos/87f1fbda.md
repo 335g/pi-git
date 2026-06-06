@@ -2,7 +2,7 @@
   "id": "87f1fbda",
   "title": "commands/git-diff.ts を抽出ヘルパーを使用するよう更新",
   "tags": [],
-  "status": "completed",
+  "status": "closed",
   "created_at": "2026-05-29T15:25:55.904Z"
 }
 
