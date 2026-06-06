@@ -252,10 +252,10 @@ function getSystemPrompt(lang: string): string {
 
 ルール:
 - type は feat, fix, docs, style, refactor, test, chore から選択
+- サブジェクトは必ず日本語で記述する
 - サブジェクトは50文字以内
 - 命令形を使用する
 - スコープは推測できる場合のみ含める
-- 日本語で記述
 
 返答はメッセージ文字列のみ。説明やコードフェンスは不要。`,
     `You are a commit message generator. From the following information, understand what the user requested and what changes were made as a result, then generate a single Conventional Commit message.
@@ -264,6 +264,7 @@ The most important input is the "user's request". Use it as the primary driver f
 
 Rules:
 - Choose type from: feat, fix, docs, style, refactor, test, chore
+- Write the subject in English
 - Keep subject under 50 characters
 - Use imperative mood
 - Include scope only if clearly inferable
@@ -356,7 +357,7 @@ ${assistantSection || "(なし)"}
 === 変更されたファイル ===
 ${filesStr || "(なし)"}
 
-上記の「ユーザーのリクエスト」を主軸に、変更の意図を最もよく表す Conventional Commit メッセージを1つ生成してください。`,
+上記の「ユーザーのリクエスト」を主軸に、変更の意図を最もよく表す Conventional Commit メッセージを1つ、**必ず日本語で**生成してください。`,
     `=== USER REQUEST (primary) ===
 ${userSection || "(none)"}
 
@@ -366,7 +367,7 @@ ${assistantSection || "(none)"}
 === CHANGED FILES ===
 ${filesStr || "(none)"}
 
-Based primarily on the USER REQUEST above, generate a single Conventional Commit message that best captures the intent of the changes.`,
+Based primarily on the USER REQUEST above, generate a single Conventional Commit message in English that best captures the intent of the changes.`,
   );
 }
 

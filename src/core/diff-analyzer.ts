@@ -35,6 +35,7 @@ function getSystemPrompt(lang: string): string {
 - 各hunk = 単一の論理的な変更（例：「機能Xを追加」「バグYを修正」）
 - 関連するファイル変更はグループ化する
 - 1ファイルに独立した複数の変更がある場合は分割する
+- コミットメッセージのサブジェクトは必ず日本語で記述する
 
 以下のJSON配列のみを返してください:
 [
@@ -43,13 +44,14 @@ function getSystemPrompt(lang: string): string {
 ]
 
 メッセージ形式: Conventional Commits (feat, fix, docs, style, refactor, test, chore)。
-サブジェクトは50文字以内。日本語で記述。`,
+サブジェクトは50文字以内。`,
     `Split git diff into logical hunks.
 
 Rules:
 - Each hunk = single logical change (e.g., "add feature X", "fix bug Y")
 - Group related file changes together
 - Split independent changes within one file into separate hunks
+- Write commit message subjects in English
 
 Return ONLY a JSON array:
 [
@@ -58,7 +60,7 @@ Return ONLY a JSON array:
 ]
 
 Message format: Conventional Commits (feat, fix, docs, style, refactor, test, chore).
-Keep subject under 50 chars. Use imperative mood.`,
+Keep subject under 50 chars. Use imperative mood. Write in English.`,
   );
 }
 
@@ -70,6 +72,7 @@ function buildPrompt(diff: string, lang: string): string {
 ${diff}
 \`\`\`
 
+コミットメッセージのサブジェクトは必ず日本語で記述してください。
 指定された形式のJSON配列のみを返してください。`,
     `Here is the git diff to analyze. Split it into logical hunks:
 
@@ -77,6 +80,7 @@ ${diff}
 ${diff}
 \`\`\`
 
+Write commit message subjects in English.
 Respond with ONLY a JSON array of hunks as specified.`,
   );
 }
