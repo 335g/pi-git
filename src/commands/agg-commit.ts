@@ -113,6 +113,15 @@ export async function handleAggCommit(
       const hunk = hunks[i];
       await footerManager.setCommitProgress(i + 1, hunks.length);
 
+      // Ensure clean staging area before each hunk
+      try {
+        await resetStaging(pi, ctx.cwd);
+      } catch {
+        ctx.ui.notify("Failed to reset staging area, aborting batch", "error");
+        failedCount++;
+        break;
+      }
+
       try {
         await stageFiles(pi, hunk.files, ctx.cwd);
       } catch {
@@ -136,14 +145,9 @@ export async function handleAggCommit(
         { cwd: ctx.cwd },
       );
       if (exitCode !== 0) {
-        try {
-          await resetStaging(pi, ctx.cwd);
-        } catch {
-          // Ignore reset errors
-        }
         const detail = stderr.trim() ? ` — ${stderr.trim()}` : "";
         ctx.ui.notify(
-          `Commit failed for "${hunk.message}" (exit code ${exitCode}).${detail} Staging has been reset.`,
+          `Commit failed for "${hunk.message}" (exit code ${exitCode}).${detail}`,
           "warning",
         );
         failedCount++;
@@ -169,6 +173,8 @@ export async function handleAggCommit(
       ctx.ui.notify(parts.join(", "), "info");
     }
   } finally {
+    // Final cleanup: ensure staging area is clean
+    try { await resetStaging(pi, ctx.cwd); } catch { /* ignore */ }
     await footerManager.clearRunning();
   }
 }
