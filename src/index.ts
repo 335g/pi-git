@@ -14,9 +14,13 @@ import { footerManager } from "./utils/footer-manager.js";
 
 export default function (pi: ExtensionAPI) {
   pi.on("session_start", async (_event, ctx) => {
-    if (ctx.hasUI) {
-      footerManager.initialize(pi, ctx.ui, ctx.cwd);
-      await footerManager.refresh();
+    try {
+      if (ctx.hasUI) {
+        footerManager.initialize(pi, ctx.ui, ctx.cwd);
+        await footerManager.refresh();
+      }
+    } catch {
+      // Silently ignore initialization errors to prevent unhandled rejections
     }
   });
 
@@ -43,6 +47,10 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("agent_end", async (event, ctx) => {
-    await handleAutoCommit(pi, ctx, event as AgentEndEvent);
+    try {
+      await handleAutoCommit(pi, ctx, event as AgentEndEvent);
+    } catch {
+      // Silently ignore auto-commit errors to prevent unhandled rejections
+    }
   });
 }
