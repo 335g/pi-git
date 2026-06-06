@@ -64,7 +64,7 @@ Toggles automatic `git-agg-commit` after assistant responses. When enabled, unco
 
 ### `/git-config`
 
-Gets, sets, or lists pi-git configuration values. Supports global (`~/.config/pi-git/settings.json`) and local (`<repo-root>/.pi-git/settings.json`) scopes.
+Gets, sets, or lists pi-git configuration values. Supports global (`~/.config/pi-git/settings.json`) and local (`<repo-root>/pi-git.toml`) scopes.
 
 ```
 /git-config <key> [value] [--global] [--list] [--show-origin] [--keys] [--models] [--help]

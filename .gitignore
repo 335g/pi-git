@@ -12,4 +12,5 @@ apm_modules/
 .claude
 
 .pi-git/
+pi-git.toml
 .npmrc

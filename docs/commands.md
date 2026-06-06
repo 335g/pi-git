@@ -78,7 +78,7 @@ Toggle the automatic `git-agg-commit` feature. When enabled, `pi-git` automatica
 
 ### Behavior
 
-- Saves the setting to the **local** config (`<repo-root>/.pi-git/settings.json`) when inside a git repository, or the **global** config (`~/.config/pi-git/settings.json`) as a fallback when outside a repo.
+- Saves the setting to the **local** config (`<repo-root>/pi-git.toml`) when inside a git repository, or the **global** config (`~/.config/pi-git/settings.json`) as a fallback when outside a repo.
 - Updates the persistent footer indicator `auto-commit: on (clean)` or `auto-commit: on (changed)` based on working tree state when enabled.
 - The auto-commit trigger fires on the `agent_end` event.
 - Does not run if another `/git-agg-commit` is already in progress.
@@ -91,7 +91,7 @@ Get, set, or list `pi-git` configuration values. Supports both global and local 
 
 ### Settings Precedence
 
-1. **Local config** — `<repo-root>/.pi-git/settings.json` (highest priority)
+1. **Local config** — `<repo-root>/pi-git.toml` (highest priority)
 2. **Global config** — `~/.config/pi-git/settings.json`
 3. **Built-in defaults** — `{"lang": "en", "auto_agg_commit": false, "analysis_model": ""}` (lowest priority)
 
@@ -134,10 +134,10 @@ Values from local config take precedence over global config. If a key is missing
 
 | Situation | Target | Behavior |
 |-----------|--------|----------|
-| Inside a git repo, no `--global` | Local | Saves to `<repo-root>/.pi-git/settings.json` |
+| Inside a git repo, no `--global` | Local | Saves to `<repo-root>/pi-git.toml` |
 | Inside a git repo, `--global` | Global | Saves to `~/.config/pi-git/settings.json` |
 | Outside a git repo, no `--global` | Global (fallback) | Saves to `~/.config/pi-git/settings.json` with a notice |
-| First write, both configs absent | Local (initialized with defaults) | Creates `.pi-git/settings.json` with all default values plus the requested change |
+| First write, both configs absent | Local (initialized with defaults) | Creates `pi-git.toml` with all default values plus the requested change |
 
 ### Examples
 
@@ -172,15 +172,15 @@ Manually editable JSON file. Used as the fallback when no local config exists or
 
 ### Local Config
 
-Path: `<git-repo-root>/.pi-git/settings.json`
+Path: `<git-repo-root>/pi-git.toml`
 
-Project-specific overrides. Created automatically on the first `/git-config` write inside a git repository when neither global nor local config exists yet. Only stores values that differ from or should override the global/default settings.
+Project-specific overrides in TOML format. Created automatically on the first `/git-config` write inside a git repository when neither global nor local config exists yet. Only stores values that differ from or should override the global/default settings.
 
-**Recommended:** Add `.pi-git/` to your repository's `.gitignore` if team members should not share the same pi-git settings, or commit it if you want to share project defaults.
+**Recommended:** Add `pi-git.toml` to your repository's `.gitignore` if team members should not share the same pi-git settings, or commit it if you want to share project defaults.
 
 ---
 
 ## Environment & Concurrency
 
 - All commands that modify the working tree (`/git-agg-commit`) detect and prevent concurrent execution to avoid staging area conflicts.
-- Settings are read with `cwd`-aware resolution, so running pi from a subdirectory of a monorepo still respects the repository root's `.pi-git/settings.json`.
+- Settings are read with `cwd`-aware resolution, so running pi from a subdirectory of a monorepo still respects the repository root's `pi-git.toml`.

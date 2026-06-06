@@ -3,13 +3,14 @@
  *
  * Settings are stored in:
  * - Global: ~/.config/pi-git/settings.json
- * - Local:  <git-root>/.pi-git/settings.json (takes precedence)
+ * - Local:  <git-root>/pi-git.toml (takes precedence)
  */
 
 import { execSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { parse as parseToml, stringify as stringifyToml } from "smol-toml";
 import type { MessageKey } from "../i18n/messages.js";
 
 export interface PiGitSettings {
@@ -64,8 +65,8 @@ export const DEFAULT_SETTINGS: PiGitSettings = {
 
 export const GLOBAL_CONFIG_DIR = join(homedir(), ".config", "pi-git");
 export const GLOBAL_SETTINGS_FILE = join(GLOBAL_CONFIG_DIR, "settings.json");
-const LOCAL_SETTINGS_DIR = ".pi-git";
-const LOCAL_SETTINGS_FILE = "settings.json";
+const LOCAL_SETTINGS_FILE = "pi-git.toml";
+const LEGACY_LOCAL_PATH = join(".pi-git", "settings.json");
 
 // ───────────────────────────────────────────────
 // File I/O helpers
@@ -91,7 +92,19 @@ export function getLocalSettingsPath(cwd?: string): string | null {
       stdio: ["pipe", "pipe", "ignore"],
     }).trim();
     if (!repoRoot) return null;
-    return join(repoRoot, LOCAL_SETTINGS_DIR, LOCAL_SETTINGS_FILE);
+    return join(repoRoot, LOCAL_SETTINGS_FILE);
+  } catch {
+    return null;
+  }
+}
+
+function loadToml(path: string): PiGitSettings | null {
+  if (!existsSync(path)) return null;
+  try {
+    const raw = readFileSync(path, "utf-8");
+    const parsed = parseToml(raw);
+    if (typeof parsed !== "object" || parsed === null) return null;
+    return parsed as PiGitSettings;
   } catch {
     return null;
   }
@@ -103,7 +116,31 @@ function loadRaw(cwd?: string): {
 } {
   const global = loadJson(GLOBAL_SETTINGS_FILE) ?? {};
   const localPath = getLocalSettingsPath(cwd);
-  const local = localPath ? loadJson(localPath) : null;
+  const local = localPath ? loadToml(localPath) : null;
+
+  // Detect legacy settings file and warn if found
+  if (!local && localPath) {
+    try {
+      const repoRoot = execSync("git rev-parse --show-toplevel", {
+        cwd,
+        encoding: "utf-8",
+        stdio: ["pipe", "pipe", "ignore"],
+      }).trim();
+      if (repoRoot) {
+        const legacyPath = join(repoRoot, LEGACY_LOCAL_PATH);
+        if (existsSync(legacyPath)) {
+          console.warn(
+            "[pi-git] Found legacy .pi-git/settings.json. " +
+            "Settings are now read from pi-git.toml. " +
+            "Please migrate your settings manually or create pi-git.toml via /git-config.",
+          );
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   return { global, local };
 }
 
@@ -198,8 +235,8 @@ export function saveLocalSettings(
     throw new Error("Not inside a git repository");
   }
   mkdirSync(dirname(localPath), { recursive: true });
-  const current = loadJson(localPath) ?? {};
+  const current = loadToml(localPath) ?? {};
   const updated = { ...current, ...settings };
-  writeFileSync(localPath, `${JSON.stringify(updated, null, 2)}\n`, "utf-8");
+  writeFileSync(localPath, stringifyToml(updated), "utf-8");
   cache.clear();
 }

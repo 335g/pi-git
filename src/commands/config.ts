@@ -3,7 +3,7 @@
  *
  * Get, set, and list pi-git configuration values.
  * Supports both global (~/.config/pi-git/settings.json)
- * and local (<repo>/.pi-git/settings.json) scopes.
+ * and local (<repo>/pi-git.toml) scopes.
  */
 
 import { existsSync } from "node:fs";

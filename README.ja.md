@@ -64,7 +64,7 @@ pi install /path/to/pi-git
 
 ### `/git-config`
 
-pi-git の設定値を取得・設定・一覧表示します。グローバル（`~/.config/pi-git/settings.json`）とローカル（`<リポジトリルート>/.pi-git/settings.json`）スコープに対応しています。
+pi-git の設定値を取得・設定・一覧表示します。グローバル（`~/.config/pi-git/settings.json`）とローカル（`<リポジトリルート>/pi-git.toml`）スコープに対応しています。
 
 ```
 /git-config <key> [value] [--global] [--list] [--show-origin] [--keys] [--models] [--help]
