@@ -97,8 +97,8 @@ export async function ensureReadyToCommit(
  * working tree. This "freezes" the diff so concurrent edits do not affect
  * analysis.
  *
- * @returns The diff string, or `null` if the stash operation failed.
- *          An empty string means there are no effective changes.
+ * @returns The diff string, or `null` if the stash operation failed
+ *          (push or show). An empty string means there are no effective changes.
  */
 export async function collectDiff(
   pi: ExtensionAPI,
@@ -115,11 +115,14 @@ export async function collectDiff(
 
   let diff = "";
   try {
-    const { stdout: stashDiff } = await pi.exec(
+    const { stdout: stashDiff, code: showCode } = await pi.exec(
       "git",
       ["stash", "show", "-p", "stash@{0}"],
       { cwd },
     );
+    if (showCode !== 0) {
+      return null;
+    }
     diff = stashDiff;
 
     // stash@{0}^3 contains untracked files when -u was used
