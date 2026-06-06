@@ -6,7 +6,7 @@
  * and assistant's responses.
  */
 
-import type { Context } from "@earendil-works/pi-ai";
+import type { Api, Context, Model } from "@earendil-works/pi-ai";
 import { completeSimple } from "@earendil-works/pi-ai";
 import type {
   ExtensionAPI,
@@ -30,6 +30,218 @@ function truncate(text: string, maxChars: number): string {
   // If no space found within reasonable range, just cut at maxChars
   if (lastSpace > maxChars * 0.7) return slice.substring(0, lastSpace) + "...";
   return slice + "...";
+}
+
+/** Generic commit message patterns — messages matching these lack specificity */
+const GENERIC_MESSAGE_PATTERNS: RegExp[] = [
+  /^chore:\s*apply\s*changes?\s*$/i,
+  /^chore:\s*update\s*(files?)?\s*$/i,
+  /^chore:\s*commit\s*changes?\s*$/i,
+  /^chore:\s*modify\s*(files?)?\s*$/i,
+  /^chore:\s*update\s+\S+\s*$/i,
+  /^(feat|fix|chore|docs|style|refactor|test):\s*.{0,10}$/i,
+];
+
+/** Heuristic: is this commit message too generic to be useful? */
+function isGenericMessage(message: string): boolean {
+  const m = message.trim();
+  if (m.length < 12) return true;
+  return GENERIC_MESSAGE_PATTERNS.some((p) => p.test(m));
+}
+
+/** Derive a commit-message candidate from the user's last message. */
+function userMessageToCandidate(userMessage: string): string {
+  let text = userMessage
+    .replace(/[。.！!？?]$/, "")
+    .replace(/お願いします$/, "")
+    .replace(/してください$/, "")
+    .replace(/して$/, "")
+    .replace(/\bplease\b/gi, "")
+    .replace(/\n/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!text) return "";
+
+  // Infer Conventional Commit type from keywords
+  let type = "chore";
+  if (/修正|fix|bug|バグ|不具合|error|エラー|直[しす]|訂正/i.test(text)) type = "fix";
+  else if (/追加|add|feature|機能|実装|implement|作[ってり]|作成|新規/i.test(text)) type = "feat";
+  else if (/docs|ドキュメント|readme|資料|文書/i.test(text)) type = "docs";
+  else if (/refactor|リファクタ|整理|改善|改修/i.test(text)) type = "refactor";
+  else if (/test|テスト|spec/i.test(text)) type = "test";
+  else if (/削除|remove|delete|消[しす]/i.test(text)) type = "chore";
+
+  const prefix = `${type}: `;
+  const maxBody = 50 - prefix.length;
+  if (text.length > maxBody) {
+    const cut = text.substring(0, maxBody - 1);
+    const lastBoundary = Math.max(
+      cut.lastIndexOf("、"),
+      cut.lastIndexOf("，"),
+      cut.lastIndexOf(" "),
+    );
+    text =
+      lastBoundary > maxBody * 0.5
+        ? cut.substring(0, lastBoundary) + "…"
+        : cut + "…";
+  }
+
+  return `${prefix}${text}`;
+}
+
+/** Heuristic specificity score for a commit message. Higher = more specific. */
+function specificityScore(message: string): number {
+  let score = 0;
+  const m = message.replace(
+    /^(feat|fix|chore|docs|style|refactor|test|perf|ci|build|revert)(\(.+?\))?!?:\s*/i,
+    "",
+  );
+
+  // Length contributes (up to a point)
+  score += Math.min(m.length, 30) * 0.3;
+
+  // Penalize generic words
+  const genericWords = /\b(change|update|modify|fix|apply|commit|files?|stuff|things?)\b/gi;
+  const genericCount = (m.match(genericWords) || []).length;
+  score -= genericCount * 2;
+
+  // Reward specific nouns (CamelCase, ALL_CAPS, or mixed-case words)
+  const specificTerms = m.match(/[A-Z][a-z]+|[a-z]+[A-Z]|[A-Z]{2,}/g);
+  score += (specificTerms || []).length * 3;
+
+  // Reward concrete action verbs
+  const concreteVerbs =
+    /\b(add|implement|create|remove|refactor|extract|rename|optimize|migrate|configure|integrate|replace|split|merge|enhance|introduce|deprecate|upgrade|downgrade|support|handle|prevent|allow|restrict|validate|sanitize|normalize|format|generate|bump|release|deploy|fix|resolve|address|correct|adjust|tweak|improve|streamline|simplify|reduce|increase|enable|disable|expose|hide|export|import|wire|connect|disconnect|setup|teardown)\b/gi;
+  score += (m.match(concreteVerbs) || []).length * 2;
+
+  return score;
+}
+
+/**
+ * If the generated message is generic, compare it against a candidate derived
+ * from the user's last message and return the more specific one.
+ *
+ * Uses AI comparison when available; falls back to heuristic scoring.
+ */
+async function refineMessageIfGeneric(
+  model: Model<Api>,
+  auth: { apiKey?: string; headers?: Record<string, string> },
+  ctx: ExtensionContext,
+  generatedMessage: string,
+  messages: SimpleMessage[],
+  changedFiles: string[],
+  lang: string,
+): Promise<string> {
+  // Only refine if the generated message seems generic
+  if (!isGenericMessage(generatedMessage)) {
+    return generatedMessage;
+  }
+
+  // Get the last user message
+  const userMessages = collectMessagesByRole(messages, "user");
+  if (userMessages.length === 0) {
+    return generatedMessage;
+  }
+
+  const lastUserMessage = userMessages[0]; // newest first
+  const userCandidate = userMessageToCandidate(lastUserMessage);
+  if (!userCandidate) {
+    return generatedMessage;
+  }
+
+  // Quick heuristic guard: skip AI if one candidate is clearly better
+  const genScore = specificityScore(generatedMessage);
+  const userScore = specificityScore(userCandidate);
+  if (userScore > genScore + 5) return userCandidate;
+  if (genScore > userScore + 5) return generatedMessage;
+
+  // Scores are close — ask AI to decide
+  try {
+    const comparisonPrompt = t(
+      lang,
+      [
+        "あなたはコミットメッセージの品質評価ツールです。",
+        "同じ変更セットに対する2つの候補メッセージがあります。",
+        "",
+        `候補A（会話分析から生成）: "${generatedMessage}"`,
+        `候補B（ユーザーの依頼から抽出）: "${userCandidate}"`,
+        "",
+        `変更ファイル: ${changedFiles.join(", ")}`,
+        "",
+        "より**具体的で**、変更内容を正確に表している方を選び、",
+        "そのメッセージ文字列だけを返してください。",
+        "説明や補足は一切不要です。",
+      ].join("\n"),
+      [
+        "You are a commit message quality evaluator.",
+        "Two candidate messages exist for the same set of changes.",
+        "",
+        `Candidate A (generated from analysis): "${generatedMessage}"`,
+        `Candidate B (derived from user request): "${userCandidate}"`,
+        "",
+        `Changed files: ${changedFiles.join(", ")}`,
+        "",
+        "Choose the one that is MORE SPECIFIC and accurately describes the changes.",
+        "Return ONLY the chosen message string. No explanations.",
+      ].join("\n"),
+    );
+
+    const context: Context = {
+      systemPrompt: t(
+        lang,
+        "コミットメッセージ候補から最も具体的なものを選び、その文字列のみを返してください。",
+        "Choose the most specific commit message candidate. Return only the chosen message string.",
+      ),
+      messages: [
+        {
+          role: "user",
+          content: comparisonPrompt,
+          timestamp: Date.now(),
+        },
+      ],
+    };
+
+    const result = await completeSimple(model, context, {
+      apiKey: auth.apiKey,
+      headers: auth.headers,
+      signal: ctx.signal,
+      reasoning: "minimal",
+      temperature: 0,
+      maxTokens: 100,
+    });
+
+    const text = result.content
+      .filter((c): c is { type: "text"; text: string } => c.type === "text")
+      .map((c) => c.text)
+      .join("")
+      .trim()
+      // Strip code fences if the model wraps the message
+      .replace(/^```[a-z]*\n?/i, "")
+      .replace(/\n?```$/i, "")
+      .trim();
+
+    // Validate the AI's choice: if it contains the user candidate, prefer that
+    if (
+      userCandidate.length >= 15 &&
+      text.includes(userCandidate.substring(0, 15))
+    ) {
+      return userCandidate;
+    }
+    // If it contains the generated message's subject, keep it
+    if (
+      generatedMessage.length >= 15 &&
+      text.includes(generatedMessage.substring(0, 15))
+    ) {
+      return generatedMessage;
+    }
+
+    // Fallback: use heuristic scores
+    return userScore > genScore ? userCandidate : generatedMessage;
+  } catch {
+    // AI failed — fall back to heuristic scoring
+    return userScore > genScore ? userCandidate : generatedMessage;
+  }
 }
 
 function getSystemPrompt(lang: string): string {
@@ -214,7 +426,22 @@ export async function generateAutoCommitMessage(
       .join("")
       .trim();
 
-    return sanitizeCommitMessage(text || "chore: apply changes", changedFiles);
+    const commitMessage = sanitizeCommitMessage(
+      text || "chore: apply changes",
+      changedFiles,
+    );
+
+    // If the generated message is too generic, compare with a user-message
+    // candidate and pick the more specific one (heuristic → AI comparison)
+    return await refineMessageIfGeneric(
+      model,
+      auth,
+      ctx,
+      commitMessage,
+      messages,
+      changedFiles,
+      lang,
+    );
   } catch {
     return sanitizeCommitMessage("chore: apply changes", changedFiles);
   }
