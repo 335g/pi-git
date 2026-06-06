@@ -131,8 +131,8 @@ function loadRaw(cwd?: string): {
         if (existsSync(legacyPath)) {
           console.warn(
             "[pi-git] Found legacy .pi-git/settings.json. " +
-            "Settings are now read from pi-git.toml. " +
-            "Please migrate your settings manually or create pi-git.toml via /git-config.",
+              "Settings are now read from pi-git.toml. " +
+              "Please migrate your settings manually or create pi-git.toml via /git-config.",
           );
         }
       }
@@ -224,6 +224,25 @@ export function saveGlobalSettings(settings: Partial<PiGitSettings>): void {
     "utf-8",
   );
   cache.clear();
+}
+
+/**
+ * Create (or overwrite) pi-git.toml with DEFAULT_SETTINGS at the repo root.
+ *
+ * @param cwdOrPath - Working directory (to resolve git root) or an already-resolved
+ *   local settings path. If a path ending in "pi-git.toml" is passed, it is used directly
+ *   without re-running git rev-parse.
+ * @returns The written path, or null if not inside a git repo.
+ */
+export function initLocalSettings(cwdOrPath?: string): string | null {
+  const localPath = cwdOrPath?.endsWith("pi-git.toml")
+    ? cwdOrPath
+    : getLocalSettingsPath(cwdOrPath);
+  if (!localPath) return null;
+  mkdirSync(dirname(localPath), { recursive: true });
+  writeFileSync(localPath, stringifyToml(DEFAULT_SETTINGS), "utf-8");
+  cache.clear();
+  return localPath;
 }
 
 export function saveLocalSettings(
