@@ -65,12 +65,11 @@ export async function handleAggCommit(
     return;
   }
 
-  await footerManager.setRunning("agg-commit", "prepare", runLang);
-
   try {
+    await footerManager.setRunning("agg-commit", "prepare", runLang);
+
     const preCheck = await ensureReadyToCommit(pi, ctx.cwd);
     if (preCheck) {
-      await footerManager.clearRunning();
       ctx.ui.notify(
         preCheck === "not_git_repo"
           ? "Not a git repository"
@@ -84,12 +83,10 @@ export async function handleAggCommit(
     await footerManager.setPhase("collectDiff", runLang);
     const diff = await collectDiff(pi, ctx.cwd);
     if (diff === null) {
-      await footerManager.clearRunning();
       ctx.ui.notify("Failed to stash changes", "warning");
       return;
     }
     if (!diff.trim()) {
-      await footerManager.clearRunning();
       ctx.ui.notify("No changes to commit", "info");
       return;
     }
@@ -98,7 +95,6 @@ export async function handleAggCommit(
     await footerManager.setPhase("analyze", runLang);
     let hunks = await analyzeDiff(pi, ctx, diff, runLang);
     if (hunks.length === 0) {
-      await footerManager.clearRunning();
       ctx.ui.notify("No hunks found to commit", "info");
       return;
     }

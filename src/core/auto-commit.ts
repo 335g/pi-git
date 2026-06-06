@@ -56,9 +56,9 @@ export async function handleAutoCommit(
 
   const lang = getLanguage(ctx.cwd);
 
-  await footerManager.setRunning("auto-commit", "generateMessage");
-
   try {
+    await footerManager.setRunning("auto-commit", "generateMessage");
+
     const { stdout: statusOutput } = await pi.exec(
       "git",
       ["status", "--short"],
@@ -72,7 +72,6 @@ export async function handleAutoCommit(
       .filter(Boolean);
 
     if (changedFiles.length === 0) {
-      await footerManager.clearRunning();
       return;
     }
 
