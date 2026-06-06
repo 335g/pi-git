@@ -19,7 +19,7 @@ pi install @335g/pi-git
 ```json
 {
   "dependencies": {
-    "@335g/pi-git": "^0.0.1"
+    "@335g/pi-git": "^0.0.3"
   }
 }
 ```
@@ -67,7 +67,7 @@ pi install /path/to/pi-git
 pi-git の設定値を取得・設定・一覧表示します。グローバル（`~/.config/pi-git/settings.json`）とローカル（`<リポジトリルート>/.pi-git/settings.json`）スコープに対応しています。
 
 ```
-/git-config <key> [value] [--global] [--list] [--show-origin]
+/git-config <key> [value] [--global] [--list] [--show-origin] [--keys] [--models] [--help]
 ```
 
 ---

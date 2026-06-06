@@ -19,7 +19,7 @@ Or add to your project's package.json:
 ```json
 {
   "dependencies": {
-    "@335g/pi-git": "^0.0.1"
+    "@335g/pi-git": "^0.0.3"
   }
 }
 ```
@@ -67,7 +67,7 @@ Toggles automatic `git-agg-commit` after assistant responses. When enabled, unco
 Gets, sets, or lists pi-git configuration values. Supports global (`~/.config/pi-git/settings.json`) and local (`<repo-root>/.pi-git/settings.json`) scopes.
 
 ```
-/git-config <key> [value] [--global] [--list] [--show-origin]
+/git-config <key> [value] [--global] [--list] [--show-origin] [--keys] [--models] [--help]
 ```
 
 ---

@@ -14,6 +14,7 @@ Automatically analyzes the working tree diff, splits changes into logical hunks,
 /git-agg-commit
 /git-agg-commit --lang=ja
 /git-agg-commit --language=en
+/git-agg-commit --help
 ```
 
 ### Options
@@ -72,6 +73,7 @@ Toggle the automatic `git-agg-commit` feature. When enabled, `pi-git` automatica
 /git-auto-agg-commit on      # Enable
 /git-auto-agg-commit off     # Disable
 /git-auto-agg-commit toggle  # Toggle
+/git-auto-agg-commit --help  # Show help
 ```
 
 ### Behavior
