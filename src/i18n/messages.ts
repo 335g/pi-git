@@ -25,8 +25,7 @@ export const messages = {
     // ── auto-agg-commit.ts ─────────────────────────────────────
     "autoAggCommit.help":
       "/git-auto-agg-commit [on|off|toggle] [--help]\n\nSubcommands:\n  on      Enable auto git-agg-commit\n  off     Disable auto git-agg-commit\n  toggle  Toggle auto git-agg-commit\n\nFlags:\n  --help  Show this help message\n\nWhen called without arguments, shows the current status.",
-    "autoAggCommit.status":
-      "[pi-git] Auto git-agg-commit is {status}",
+    "autoAggCommit.status": "[pi-git] Auto git-agg-commit is {status}",
     "autoAggCommit.enabled": "enabled",
     "autoAggCommit.disabled": "disabled",
     "autoAggCommit.invalidArg":
@@ -38,7 +37,7 @@ export const messages = {
 
     // ── config.ts ──────────────────────────────────────────────
     "config.help":
-      "/git-config <key> [value] [--global] [--list] [--show-origin] [--keys] [--models] [--help]\n\nSubcommands:\n  <key>           Get the value of a setting\n  <key> <value>   Set the value of a setting\n\nFlags:\n  --global        Operate on global settings\n  --list           List all configured values\n  --show-origin    Show value origin (default/global/local)\n  --keys           Show valid keys with descriptions\n  --models         Show available models for analysis_model\n  --help           Show this help message",
+      "/git-config <key> [value] [--global] [--list] [--show-origin] [--keys] [--models] [--init] [--force] [--help]\n\nSubcommands:\n  <key>           Get the value of a setting\n  <key> <value>   Set the value of a setting\n\nFlags:\n  --global        Operate on global settings\n  --list           List all configured values\n  --show-origin    Show value origin (default/global/local)\n  --keys           Show valid keys with descriptions\n  --models         Show available models for analysis_model\n  --init           Create default pi-git.toml in the repository root\n  --force          Force overwrite when used with --init\n  --help           Show this help message",
     "config.noModels": "No available models found",
     "config.modelsHeader": "Available models for analysis_model:",
     "config.noSettings": "No settings configured",
@@ -53,6 +52,14 @@ export const messages = {
     "config.savedToGlobalFallback":
       "[pi-git] Saved {key}={value} to global config (outside git repo)",
     "config.saveFailed": "[pi-git] Failed to save: {error}",
+    "config.initCreated":
+      "[pi-git] Created default pi-git.toml in the repository root.",
+    "config.initAlreadyExists":
+      "[pi-git] pi-git.toml already exists. Use --init --force to overwrite.",
+    "config.initOverwritten":
+      "[pi-git] Overwritten pi-git.toml with default settings.",
+    "config.initNotInRepo":
+      "[pi-git] Not inside a git repository. Cannot create pi-git.toml.",
 
     // ── config.ts: VALID_KEYS_META descriptions ─────────────────
     "config.keyDesc.lang": "Display and commit message language",
@@ -67,11 +74,11 @@ export const messages = {
 
     // ── diff-analyzer.ts: system prompt ────────────────────────
     "diffAnalyzer.systemPrompt":
-      "Split git diff into logical hunks.\n\nRules:\n- Each hunk = single logical change (e.g., \"add feature X\", \"fix bug Y\")\n- Group related file changes together\n- Split independent changes within one file into separate hunks\n- Write commit message subjects in English\n\nReturn ONLY a JSON array:\n[\n  {\"files\": [\"path/to/file1.ts\", \"path/to/file2.ts\"], \"message\": \"feat(scope): add feature\"},\n  {\"files\": [\"path/to/file3.ts\"], \"message\": \"fix: resolve null check\"}\n]\n\nMessage format: Conventional Commits (feat, fix, docs, style, refactor, test, chore).\nKeep subject under 50 chars. Use imperative mood. Write in English.",
+      'Split git diff into logical hunks.\n\nRules:\n- Each hunk = single logical change (e.g., "add feature X", "fix bug Y")\n- Group related file changes together\n- Split independent changes within one file into separate hunks\n- Write commit message subjects in English\n\nReturn ONLY a JSON array:\n[\n  {"files": ["path/to/file1.ts", "path/to/file2.ts"], "message": "feat(scope): add feature"},\n  {"files": ["path/to/file3.ts"], "message": "fix: resolve null check"}\n]\n\nMessage format: Conventional Commits (feat, fix, docs, style, refactor, test, chore).\nKeep subject under 50 chars. Use imperative mood. Write in English.',
 
     // ── diff-analyzer.ts: few-shot examples ────────────────────
     "diffAnalyzer.examples":
-      "Examples of correct output:\n\nInput: diff with src/auth/login.ts (added login function), src/auth/types.ts (added User type)\nOutput: [{\"files\": [\"src/auth/login.ts\", \"src/auth/types.ts\"], \"message\": \"feat(auth): add login functionality\"}]\n\nInput: diff with README.md (fixed typo in installation section), package.json (version bump)\nOutput: [{\"files\": [\"README.md\"], \"message\": \"docs: fix typo in README\"}, {\"files\": [\"package.json\"], \"message\": \"chore: bump version to 1.2.0\"}]",
+      'Examples of correct output:\n\nInput: diff with src/auth/login.ts (added login function), src/auth/types.ts (added User type)\nOutput: [{"files": ["src/auth/login.ts", "src/auth/types.ts"], "message": "feat(auth): add login functionality"}]\n\nInput: diff with README.md (fixed typo in installation section), package.json (version bump)\nOutput: [{"files": ["README.md"], "message": "docs: fix typo in README"}, {"files": ["package.json"], "message": "chore: bump version to 1.2.0"}]',
 
     // ── diff-analyzer.ts: user prompt ──────────────────────────
     "diffAnalyzer.buildPrompt":
@@ -83,7 +90,7 @@ export const messages = {
 
     // ── auto-commit-message.ts: few-shot examples ──────────────
     "autoCommitMsg.examples":
-      "Examples:\n\nUser request: \"Add a login form to the auth page\"\nAssistant response: \"I've added login.tsx with form validation and connected it to the auth API.\"\nChanged files: src/auth/login.tsx, src/auth/api.ts\n→ feat(auth): add login form\n\nUser request: \"Fix the null pointer error in the payment flow\"\nAssistant response: \"Added null check in PaymentProcessor.handle(). The error should be resolved now.\"\nChanged files: src/payment/processor.ts\n→ fix(payment): add null check in processor",
+      'Examples:\n\nUser request: "Add a login form to the auth page"\nAssistant response: "I\'ve added login.tsx with form validation and connected it to the auth API."\nChanged files: src/auth/login.tsx, src/auth/api.ts\n→ feat(auth): add login form\n\nUser request: "Fix the null pointer error in the payment flow"\nAssistant response: "Added null check in PaymentProcessor.handle(). The error should be resolved now."\nChanged files: src/payment/processor.ts\n→ fix(payment): add null check in processor',
 
     // ── auto-commit-message.ts: user prompt ────────────────────
     "autoCommitMsg.buildPrompt":
@@ -119,8 +126,7 @@ export const messages = {
     // ── auto-agg-commit.ts ─────────────────────────────────────
     "autoAggCommit.help":
       "/git-auto-agg-commit [on|off|toggle] [--help]\n\nサブコマンド:\n  on      自動 git-agg-commit を有効にする\n  off     自動 git-agg-commit を無効にする\n  toggle  自動 git-agg-commit の有効/無効を切り替える\n\nフラグ:\n  --help  このヘルプを表示\n\n引数を省略すると、現在の状態を表示します。",
-    "autoAggCommit.status":
-      "[pi-git] 自動 git-agg-commit は{status}です",
+    "autoAggCommit.status": "[pi-git] 自動 git-agg-commit は{status}です",
     "autoAggCommit.enabled": "有効",
     "autoAggCommit.disabled": "無効",
     "autoAggCommit.invalidArg":
@@ -132,7 +138,7 @@ export const messages = {
 
     // ── config.ts ──────────────────────────────────────────────
     "config.help":
-      "/git-config <key> [value] [--global] [--list] [--show-origin] [--keys] [--models] [--help]\n\nサブコマンド:\n  <key>           設定値を取得\n  <key> <value>   設定値を変更\n\nフラグ:\n  --global        グローバル設定に対して操作\n  --list           すべての設定値を一覧表示\n  --show-origin    値の取得元（default/global/local）を表示\n  --keys           有効なキー一覧と説明を表示\n  --models         analysis_model に設定可能なモデル一覧を表示\n  --help           このヘルプを表示",
+      "/git-config <key> [value] [--global] [--list] [--show-origin] [--keys] [--models] [--init] [--force] [--help]\n\nサブコマンド:\n  <key>           設定値を取得\n  <key> <value>   設定値を変更\n\nフラグ:\n  --global        グローバル設定に対して操作\n  --list           すべての設定値を一覧表示\n  --show-origin    値の取得元（default/global/local）を表示\n  --keys           有効なキー一覧と説明を表示\n  --models         analysis_model に設定可能なモデル一覧を表示\n  --init           リポジトリルートにデフォルトの pi-git.toml を作成\n  --force          --init と併用して強制的に上書き\n  --help           このヘルプを表示",
     "config.noModels": "利用可能なモデルが見つかりません",
     "config.modelsHeader": "analysis_model に設定可能なモデル一覧:",
     "config.noSettings": "設定はありません",
@@ -149,11 +155,18 @@ export const messages = {
     "config.savedToGlobalFallback":
       "[pi-git] {key}={value} をグローバル設定に保存しました（Gitリポジトリ外のため）",
     "config.saveFailed": "[pi-git] 保存に失敗しました: {error}",
+    "config.initCreated":
+      "[pi-git] リポジトリルートにデフォルトの pi-git.toml を作成しました。",
+    "config.initAlreadyExists":
+      "[pi-git] pi-git.toml はすでに存在します。上書きするには --init --force を使用してください。",
+    "config.initOverwritten":
+      "[pi-git] pi-git.toml をデフォルト設定で上書きしました。",
+    "config.initNotInRepo":
+      "[pi-git] Git リポジトリ内ではありません。pi-git.toml を作成できません。",
 
     // ── config.ts: VALID_KEYS_META descriptions ─────────────────
     "config.keyDesc.lang": "表示・コミットメッセージの言語設定",
-    "config.keyDesc.auto_agg_commit":
-      "アシスタント応答後の自動コミット有無",
+    "config.keyDesc.auto_agg_commit": "アシスタント応答後の自動コミット有無",
     "config.keyDesc.analysis_model":
       "diff分析に使用するAIモデル（形式: provider/model-id）",
 
@@ -163,11 +176,11 @@ export const messages = {
 
     // ── diff-analyzer.ts: system prompt ────────────────────────
     "diffAnalyzer.systemPrompt":
-      "git diffを論理的なhunkに分割してください。\n\nルール:\n- 各hunk = 単一の論理的な変更（例：「機能Xを追加」「バグYを修正」）\n- 関連するファイル変更はグループ化する\n- 1ファイルに独立した複数の変更がある場合は分割する\n- コミットメッセージのサブジェクトは必ず日本語で記述する\n\n以下のJSON配列のみを返してください:\n[\n  {\"files\": [\"path/to/file1.ts\", \"path/to/file2.ts\"], \"message\": \"feat: 機能を追加\"},\n  {\"files\": [\"path/to/file3.ts\"], \"message\": \"fix: バグを修正\"}\n]\n\nメッセージ形式: Conventional Commits (feat, fix, docs, style, refactor, test, chore)。\nサブジェクトは50文字以内。",
+      'git diffを論理的なhunkに分割してください。\n\nルール:\n- 各hunk = 単一の論理的な変更（例：「機能Xを追加」「バグYを修正」）\n- 関連するファイル変更はグループ化する\n- 1ファイルに独立した複数の変更がある場合は分割する\n- コミットメッセージのサブジェクトは必ず日本語で記述する\n\n以下のJSON配列のみを返してください:\n[\n  {"files": ["path/to/file1.ts", "path/to/file2.ts"], "message": "feat: 機能を追加"},\n  {"files": ["path/to/file3.ts"], "message": "fix: バグを修正"}\n]\n\nメッセージ形式: Conventional Commits (feat, fix, docs, style, refactor, test, chore)。\nサブジェクトは50文字以内。',
 
     // ── diff-analyzer.ts: few-shot examples ────────────────────
     "diffAnalyzer.examples":
-      "正しい出力の例:\n\n入力: src/auth/login.ts（ログイン機能を追加）, src/auth/types.ts（User型を追加）のdiff\n出力: [{\"files\": [\"src/auth/login.ts\", \"src/auth/types.ts\"], \"message\": \"feat(auth): ログイン機能を追加\"}]\n\n入力: README.md（インストール手順の誤字を修正）, package.json（バージョン更新）のdiff\n出力: [{\"files\": [\"README.md\"], \"message\": \"docs: READMEの誤字を修正\"}, {\"files\": [\"package.json\"], \"message\": \"chore: バージョンを1.2.0に更新\"}]",
+      '正しい出力の例:\n\n入力: src/auth/login.ts（ログイン機能を追加）, src/auth/types.ts（User型を追加）のdiff\n出力: [{"files": ["src/auth/login.ts", "src/auth/types.ts"], "message": "feat(auth): ログイン機能を追加"}]\n\n入力: README.md（インストール手順の誤字を修正）, package.json（バージョン更新）のdiff\n出力: [{"files": ["README.md"], "message": "docs: READMEの誤字を修正"}, {"files": ["package.json"], "message": "chore: バージョンを1.2.0に更新"}]',
 
     // ── diff-analyzer.ts: user prompt ──────────────────────────
     "diffAnalyzer.buildPrompt":
@@ -189,7 +202,7 @@ export const messages = {
     "autoCommitMsg.compareSystemPrompt":
       "コミットメッセージ候補から最も具体的なものを選び、その文字列のみを返してください。",
     "autoCommitMsg.comparePrompt":
-      "あなたはコミットメッセージの品質評価ツールです。\n同じ変更セットに対する2つの候補メッセージがあります。\n\n候補A（会話分析から生成）: \"{candidateA}\"\n候補B（ユーザーの依頼から抽出）: \"{candidateB}\"\n\n変更ファイル: {files}\n\nより**具体的で**、変更内容を正確に表している方を選び、\nそのメッセージ文字列だけを返してください。\n説明や補足は一切不要です。",
+      'あなたはコミットメッセージの品質評価ツールです。\n同じ変更セットに対する2つの候補メッセージがあります。\n\n候補A（会話分析から生成）: "{candidateA}"\n候補B（ユーザーの依頼から抽出）: "{candidateB}"\n\n変更ファイル: {files}\n\nより**具体的で**、変更内容を正確に表している方を選び、\nそのメッセージ文字列だけを返してください。\n説明や補足は一切不要です。',
 
     // ── auto-commit-message.ts: fallback text for empty sections
     "autoCommitMsg.noData": "（なし）",

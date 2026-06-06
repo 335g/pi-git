@@ -19,6 +19,7 @@ import {
   getLocalSettingsPath,
   getSettings,
   getSettingWithOrigin,
+  initLocalSettings,
   saveGlobalSettings,
   saveLocalSettings,
   VALID_KEYS_META,
@@ -71,6 +72,8 @@ export async function handleConfig(
   let showOrigin = false;
   let keys = false;
   let models = false;
+  let init = false;
+  let force = false;
   let help = false;
   const positional: string[] = [];
 
@@ -80,17 +83,47 @@ export async function handleConfig(
     else if (token === "--show-origin") showOrigin = true;
     else if (token === "--keys") keys = true;
     else if (token === "--models") models = true;
+    else if (token === "--init") init = true;
+    else if (token === "--force") force = true;
     else if (token === "--help") help = true;
     else positional.push(token);
   }
 
   if (help) {
-    ctx.ui.notify(
-      t(lang,
-        "config.help",
-      ),
-      "info",
-    );
+    ctx.ui.notify(t(lang, "config.help"), "info");
+    return;
+  }
+
+  if (init) {
+    const localPath = getLocalSettingsPath(ctx.cwd);
+    if (!localPath) {
+      ctx.ui.notify(t(lang, "config.initNotInRepo"), "warning");
+      return;
+    }
+
+    // existsSync must be evaluated before initLocalSettings —
+    // after write it's always true.
+    const existed = existsSync(localPath);
+    if (existed && !force) {
+      ctx.ui.notify(t(lang, "config.initAlreadyExists"), "warning");
+      return;
+    }
+
+    try {
+      // Pass the already-resolved path to avoid a redundant git rev-parse.
+      initLocalSettings(localPath);
+      ctx.ui.notify(
+        t(lang, existed ? "config.initOverwritten" : "config.initCreated"),
+        "info",
+      );
+    } catch (err) {
+      ctx.ui.notify(
+        t(lang, "config.saveFailed", {
+          error: err instanceof Error ? err.message : String(err),
+        }),
+        "error",
+      );
+    }
     return;
   }
 
@@ -110,10 +143,7 @@ export async function handleConfig(
   if (models) {
     const availableModels = ctx.modelRegistry.getAvailable();
     if (availableModels.length === 0) {
-      ctx.ui.notify(
-        t(lang, "config.noModels"),
-        "warning",
-      );
+      ctx.ui.notify(t(lang, "config.noModels"), "warning");
       return;
     }
 
@@ -125,9 +155,7 @@ export async function handleConfig(
       return `${modelId}${marker}`;
     });
 
-    const header = t(lang,
-      "config.modelsHeader",
-    );
+    const header = t(lang, "config.modelsHeader");
     ctx.ui.notify(`${header}\n${lines.join("\n")}`, "info");
     return;
   }
@@ -155,25 +183,14 @@ export async function handleConfig(
   }
 
   if (positional.length === 0) {
-    ctx.ui.notify(
-      t(lang,
-        "config.usageHint",
-      ),
-      "warning",
-    );
+    ctx.ui.notify(t(lang, "config.usageHint"), "warning");
     return;
   }
 
   const key = positional[0];
 
   if (!isValidKey(key)) {
-    ctx.ui.notify(
-      t(lang,
-        "config.unknownKey",
-        { key },
-      ),
-      "warning",
-    );
+    ctx.ui.notify(t(lang, "config.unknownKey", { key }), "warning");
     return;
   }
 
@@ -181,13 +198,7 @@ export async function handleConfig(
     // Get single value
     const { value, origin } = getSettingWithOrigin(key, ctx.cwd);
     if (value === undefined) {
-      ctx.ui.notify(
-        t(lang,
-          "config.notSet",
-          { key },
-        ),
-        "info",
-      );
+      ctx.ui.notify(t(lang, "config.notSet", { key }), "info");
     } else {
       ctx.ui.notify(
         showOrigin ? `${value} (${origin})` : String(value),
@@ -212,10 +223,7 @@ export async function handleConfig(
     if (showGlobal) {
       saveGlobalSettings({ [key]: parsed });
       ctx.ui.notify(
-        t(lang,
-          "config.savedToGlobal",
-          { key, value: String(parsed) },
-        ),
+        t(lang, "config.savedToGlobal", { key, value: String(parsed) }),
         "info",
       );
     } else {
@@ -228,19 +236,13 @@ export async function handleConfig(
           // グローバルもローカルもない場合：デフォルト値で初期化
           saveLocalSettings({ ...DEFAULT_SETTINGS, [key]: parsed }, ctx.cwd);
           ctx.ui.notify(
-            t(lang,
-              "config.savedToLocalInit",
-              { key, value: String(parsed) },
-            ),
+            t(lang, "config.savedToLocalInit", { key, value: String(parsed) }),
             "info",
           );
         } else {
           saveLocalSettings({ [key]: parsed }, ctx.cwd);
           ctx.ui.notify(
-            t(lang,
-              "config.savedToLocal",
-              { key, value: String(parsed) },
-            ),
+            t(lang, "config.savedToLocal", { key, value: String(parsed) }),
             "info",
           );
         }
@@ -248,20 +250,19 @@ export async function handleConfig(
         // Fallback to global when not in a repo
         saveGlobalSettings({ [key]: parsed });
         ctx.ui.notify(
-          t(lang,
-            "config.savedToGlobalFallback",
-            { key, value: String(parsed) },
-          ),
+          t(lang, "config.savedToGlobalFallback", {
+            key,
+            value: String(parsed),
+          }),
           "info",
         );
       }
     }
   } catch (err) {
     ctx.ui.notify(
-      t(lang,
-        "config.saveFailed",
-        { error: err instanceof Error ? err.message : String(err) },
-      ),
+      t(lang, "config.saveFailed", {
+        error: err instanceof Error ? err.message : String(err),
+      }),
       "error",
     );
   }
