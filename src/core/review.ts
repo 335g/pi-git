@@ -177,10 +177,10 @@ class ReviewOverlay implements Component {
    * Render a single hunk line, or the edit Input if this hunk is being edited.
    */
   private renderHunkLine(index: number, width: number): string {
-    // Edit mode: render Input inline
+    // Edit mode: render Input inline (Input already provides its own "> " prompt)
     if (index === this.editIndex && this.editInput) {
       const inputLines = this.editInput.render(width - 2);
-      const inputText = inputLines.length > 0 ? `> ${inputLines[0]}` : "> ";
+      const inputText = inputLines.length > 0 ? inputLines[0] : "";
       return inputText.substring(0, width);
     }
 
@@ -189,15 +189,14 @@ class ReviewOverlay implements Component {
     const cursor = isSelected ? "▶" : " ";
 
     const check = hunk.included ? "✓" : " ";
-    const fileCount = `${hunk.files.length} file${hunk.files.length > 1 ? "s" : ""}`;
+    const fileCount = t(this.lang, "review.fileCount", {
+      count: String(hunk.files.length),
+    });
     const message = this.truncateMessage(hunk.message);
 
     const prefix = `${cursor} [${check}] ${fileCount}  `;
     const available = width - prefix.length;
-    const msgDisplay =
-      available > 10
-        ? message.substring(0, available)
-        : message.substring(0, width - prefix.length);
+    const msgDisplay = message.substring(0, Math.max(0, available));
 
     return prefix + msgDisplay;
   }
@@ -235,14 +234,6 @@ class ReviewOverlay implements Component {
         if (this.selectedIndex < this.reviewedHunks.length) {
           this.reviewedHunks[this.selectedIndex].included =
             !this.reviewedHunks[this.selectedIndex].included;
-
-          // If all hunks become excluded, move cursor off commit button
-          if (
-            !this.hasIncludedHunks() &&
-            this.selectedIndex === this.reviewedHunks.length
-          ) {
-            this.selectedIndex = Math.max(0, this.reviewedHunks.length - 1);
-          }
         }
         return;
 
@@ -267,6 +258,10 @@ class ReviewOverlay implements Component {
   // ── Edit mode ─────────────────────────────────────────
 
   private enterEditMode(index: number): void {
+    // Guard against re-entry while already editing
+    if (this.editInput) {
+      this.exitEditMode();
+    }
     this.editIndex = index;
     this.editInput = new Input();
     this.editInput.setValue(this.reviewedHunks[index].message);
@@ -320,6 +315,11 @@ class ReviewOverlay implements Component {
   }
 
   dispose?(): void {
+    if (this.disposed) return;
+    // Clean up edit mode before disposal
+    this.exitEditMode();
     this.disposed = true;
+    // Resolve the Promise so the caller's await completes
+    this.done({ hunks: [...this.reviewedHunks], cancelled: true });
   }
 }

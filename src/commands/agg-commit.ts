@@ -20,6 +20,7 @@ import {
   stageFiles,
 } from "../core/git.js";
 import { createReviewComponent } from "../core/review.js";
+import { sanitizeCommitMessage } from "../core/commit-message.js";
 import type { Hunk, ReviewResult } from "../types.js";
 import { t } from "../utils/lang.js";
 import { getLanguage } from "../utils/settings.js";
@@ -31,7 +32,7 @@ function parseLangArg(args: string): string | undefined {
 }
 
 function parseReviewFlag(args: string): boolean {
-  return /--review\b/.test(args);
+  return /(?:^|\s)--review(?:\s|$)/.test(args);
 }
 
 /** Extract all file paths from a git diff string */
@@ -99,10 +100,16 @@ async function commitHunks(
   ctx: ExtensionContext,
   hunks: Hunk[],
   runLang: string,
-): Promise<{ committed: number; failed: number; skipped: number }> {
+): Promise<{
+  committed: number;
+  failed: number;
+  skipped: number;
+  aborted: number;
+}> {
   let committedCount = 0;
   let failedCount = 0;
   let skippedCount = 0;
+  const total = hunks.length;
 
   for (let i = 0; i < hunks.length; i++) {
     const hunk = hunks[i];
@@ -114,7 +121,8 @@ async function commitHunks(
     } catch {
       ctx.ui.notify(t(runLang, "aggCommit.stagingResetFailed"), "error");
       failedCount++;
-      break;
+      const remaining = total - (i + 1);
+      return { committed: committedCount, failed: failedCount, skipped: skippedCount, aborted: remaining };
     }
 
     try {
@@ -159,6 +167,7 @@ async function commitHunks(
     committed: committedCount,
     failed: failedCount,
     skipped: skippedCount,
+    aborted: 0,
   };
 }
 
@@ -247,8 +256,13 @@ export async function handleAggCommit(
       if (reviewResult === null) {
         return; // cancelled — no commits
       }
-      // Only commit included hunks
-      hunks = reviewResult.hunks.filter((h) => h.included);
+      // Only commit included hunks, re-sanitize user-edited messages
+      hunks = reviewResult.hunks
+        .filter((h) => h.included)
+        .map((h) => ({
+          ...h,
+          message: sanitizeCommitMessage(h.message, h.files),
+        }));
       if (hunks.length === 0) {
         ctx.ui.notify(t(runLang, "review.noHunksSelected"), "info");
         return;
@@ -257,7 +271,7 @@ export async function handleAggCommit(
 
     // Stage and commit each hunk
     await footerManager.setPhase("commit", runLang);
-    const { committed, failed, skipped } = await commitHunks(
+    const { committed, failed, skipped, aborted } = await commitHunks(
       pi,
       ctx,
       hunks,
@@ -283,6 +297,13 @@ export async function handleAggCommit(
       parts.push(
         t(runLang, "aggCommit.summaryFailed", {
           count: String(failed),
+        }),
+      );
+    }
+    if (aborted > 0) {
+      parts.push(
+        t(runLang, "aggCommit.summaryAborted", {
+          remaining: String(aborted),
         }),
       );
     }

@@ -29,10 +29,11 @@ export const messages = {
     "review.unstagedInfo": "{count} unstaged file(s): {files}",
     "review.cancelled": "Review cancelled. No changes committed.",
     "review.noHunksSelected": "No hunks selected for commit.",
+    "review.fileCount": "{count} file(s)",
 
     // ── agg-commit.ts ──────────────────────────────────────────
     "aggCommit.help":
-      "/git-agg-commit [--lang=<lang>] [--help]\n\nOptions:\n  --lang=<lang>  Temporarily override language (not saved)\n  --help         Show this help message",
+      "/git-agg-commit [--lang=<lang>] [--review] [--help]\n\nOptions:\n  --lang=<lang>  Temporarily override language (not saved)\n  --review       Interactive review before commit\n  --help         Show this help message",
     "aggCommit.alreadyRunning":
       "git-agg-commit is already running. Please wait for it to complete.",
     "aggCommit.notGitRepo": "Not a git repository",
@@ -50,6 +51,7 @@ export const messages = {
     "aggCommit.summarySkipped": "{count} skipped",
     "aggCommit.summaryFailed": "{count} failed",
     "aggCommit.summaryAllFailed": "All commits failed",
+    "aggCommit.summaryAborted": "{remaining} hunks not attempted (staging reset failed)",
 
     // ── auto-agg-commit.ts ─────────────────────────────────────
     "autoAggCommit.help":
@@ -169,10 +171,11 @@ export const messages = {
     "review.cancelled":
       "レビューをキャンセルしました。変更はコミットされていません。",
     "review.noHunksSelected": "コミットするHunkが選択されていません。",
+    "review.fileCount": "{count}ファイル",
 
     // ── agg-commit.ts ──────────────────────────────────────────
     "aggCommit.help":
-      "/git-agg-commit [--lang=<lang>] [--help]\n\nオプション:\n  --lang=<lang>  一時的に言語を上書き（保存されません）\n  --help         このヘルプを表示",
+      "/git-agg-commit [--lang=<lang>] [--review] [--help]\n\nオプション:\n  --lang=<lang>  一時的に言語を上書き（保存されません）\n  --review       コミット前に対話レビューを実行\n  --help         このヘルプを表示",
     "aggCommit.alreadyRunning":
       "git-agg-commit 実行中です。完了してから再度実行してください。",
     "aggCommit.notGitRepo": "Gitリポジトリではありません",
@@ -190,6 +193,7 @@ export const messages = {
     "aggCommit.summarySkipped": "{count}件スキップ",
     "aggCommit.summaryFailed": "{count}件失敗",
     "aggCommit.summaryAllFailed": "すべてのコミットが失敗しました",
+    "aggCommit.summaryAborted": "残り{remaining}件は未処理です（ステージングリセット失敗のため中断）",
 
     // ── auto-agg-commit.ts ─────────────────────────────────────
     "autoAggCommit.help":
