@@ -15,12 +15,31 @@ export const messages = {
     "footer.analyze": "{prefix} Analyzing hunks...",
     "footer.generateMessage": "{prefix} Generating messages...",
     "footer.commit": "{prefix} Committing...",
+    "footer.autoCommit.off": "auto-commit: off",
+    "footer.autoCommit.onClean": "auto-commit: on (clean)",
+    "footer.autoCommit.onChanged": "auto-commit: on (changed)",
 
     // ── agg-commit.ts ──────────────────────────────────────────
     "aggCommit.help":
       "/git-agg-commit [--lang=<lang>] [--help]\n\nOptions:\n  --lang=<lang>  Temporarily override language (not saved)\n  --help         Show this help message",
     "aggCommit.alreadyRunning":
       "git-agg-commit is already running. Please wait for it to complete.",
+    "aggCommit.notGitRepo": "Not a git repository",
+    "aggCommit.mergeConflict":
+      "Merge conflicts detected. Resolve conflicts before committing.",
+    "aggCommit.noChanges": "No changes to commit",
+    "aggCommit.stashFailed": "Failed to stash changes",
+    "aggCommit.noHunksFound": "No hunks found to commit",
+    "aggCommit.stagingResetFailed":
+      "Failed to reset staging area, aborting batch",
+    "aggCommit.commitFailed":
+      'Commit failed for "{message}" (exit code {exitCode})',
+    "aggCommit.langOverride":
+      "Language set to: {lang} (this run only)",
+    "aggCommit.summaryCommitted": "Created {count} commit(s)",
+    "aggCommit.summarySkipped": "{count} skipped",
+    "aggCommit.summaryFailed": "{count} failed",
+    "aggCommit.summaryAllFailed": "All commits failed",
 
     // ── auto-agg-commit.ts ─────────────────────────────────────
     "autoAggCommit.help":
@@ -125,12 +144,31 @@ export const messages = {
     "footer.analyze": "{prefix} hunk解析中...",
     "footer.generateMessage": "{prefix} コミットメッセージ生成中...",
     "footer.commit": "{prefix} コミット実行中...",
+    "footer.autoCommit.off": "auto-commit: off",
+    "footer.autoCommit.onClean": "auto-commit: on (clean)",
+    "footer.autoCommit.onChanged": "auto-commit: on (changed)",
 
     // ── agg-commit.ts ──────────────────────────────────────────
     "aggCommit.help":
       "/git-agg-commit [--lang=<lang>] [--help]\n\nオプション:\n  --lang=<lang>  一時的に言語を上書き（保存されません）\n  --help         このヘルプを表示",
     "aggCommit.alreadyRunning":
       "git-agg-commit 実行中です。完了してから再度実行してください。",
+    "aggCommit.notGitRepo": "Gitリポジトリではありません",
+    "aggCommit.mergeConflict":
+      "マージコンフリクトが検出されました。解決してからコミットしてください。",
+    "aggCommit.noChanges": "コミットする変更がありません",
+    "aggCommit.stashFailed": "変更のスタッシュに失敗しました",
+    "aggCommit.noHunksFound": "コミットするhunkが見つかりません",
+    "aggCommit.stagingResetFailed":
+      "ステージングエリアのリセットに失敗しました。バッチを中断します",
+    "aggCommit.commitFailed":
+      'コミット失敗: "{message}" (終了コード {exitCode})',
+    "aggCommit.langOverride":
+      "言語を {lang} に設定しました（今回のみ）",
+    "aggCommit.summaryCommitted": "{count}件のコミットを作成",
+    "aggCommit.summarySkipped": "{count}件スキップ",
+    "aggCommit.summaryFailed": "{count}件失敗",
+    "aggCommit.summaryAllFailed": "すべてのコミットが失敗しました",
 
     // ── auto-agg-commit.ts ─────────────────────────────────────
     "autoAggCommit.help":

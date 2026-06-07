@@ -43,7 +43,10 @@ export async function handleAggCommit(
   const langArg = parseLangArg(args);
   const runLang = langArg ?? lang;
   if (langArg) {
-    ctx.ui.notify(`Language set to: ${langArg} (this run only)`, "info");
+    ctx.ui.notify(
+      t(runLang, "aggCommit.langOverride", { lang: langArg }),
+      "info",
+    );
   }
 
   if (!ctx.hasUI) {
@@ -60,19 +63,19 @@ export async function handleAggCommit(
 
     const preCheck = await ensureReadyToCommit(pi, ctx.cwd);
     if (preCheck) {
-      const messages: Record<
-        string,
-        { text: string; level: "warning" | "info" | "error" }
-      > = {
-        not_git_repo: { text: "Not a git repository", level: "warning" },
-        merge_conflict: {
-          text: "Merge conflicts detected. Resolve conflicts before committing.",
-          level: "error",
-        },
-        no_changes: { text: "No changes to commit", level: "info" },
-      };
-      const entry = messages[preCheck];
-      ctx.ui.notify(entry.text, entry.level);
+      const key =
+        preCheck === "not_git_repo"
+          ? "aggCommit.notGitRepo"
+          : preCheck === "merge_conflict"
+            ? "aggCommit.mergeConflict"
+            : "aggCommit.noChanges";
+      const level =
+        preCheck === "merge_conflict"
+          ? "error"
+          : preCheck === "not_git_repo"
+            ? "warning"
+            : "info";
+      ctx.ui.notify(t(runLang, key), level);
       return;
     }
 
@@ -80,11 +83,11 @@ export async function handleAggCommit(
     await footerManager.setPhase("collectDiff", runLang);
     const diff = await collectDiff(pi, ctx.cwd);
     if (diff === null) {
-      ctx.ui.notify("Failed to stash changes", "warning");
+      ctx.ui.notify(t(runLang, "aggCommit.stashFailed"), "warning");
       return;
     }
     if (!diff.trim()) {
-      ctx.ui.notify("No changes to commit", "info");
+      ctx.ui.notify(t(runLang, "aggCommit.noChanges"), "info");
       return;
     }
 
@@ -92,7 +95,7 @@ export async function handleAggCommit(
     await footerManager.setPhase("analyze", runLang);
     let hunks = await analyzeDiff(pi, ctx, diff, runLang);
     if (hunks.length === 0) {
-      ctx.ui.notify("No hunks found to commit", "info");
+      ctx.ui.notify(t(runLang, "aggCommit.noHunksFound"), "info");
       return;
     }
 
@@ -114,7 +117,10 @@ export async function handleAggCommit(
       try {
         await resetStaging(pi, ctx.cwd);
       } catch {
-        ctx.ui.notify("Failed to reset staging area, aborting batch", "error");
+        ctx.ui.notify(
+          t(runLang, "aggCommit.stagingResetFailed"),
+          "error",
+        );
         failedCount++;
         break;
       }
@@ -144,7 +150,10 @@ export async function handleAggCommit(
       if (exitCode !== 0) {
         const detail = stderr.trim() ? ` — ${stderr.trim()}` : "";
         ctx.ui.notify(
-          `Commit failed for "${hunk.message}" (exit code ${exitCode}).${detail}`,
+          t(runLang, "aggCommit.commitFailed", {
+            message: hunk.message,
+            exitCode: String(exitCode),
+          }) + detail,
           "warning",
         );
         failedCount++;
@@ -155,15 +164,30 @@ export async function handleAggCommit(
     }
 
     const parts: string[] = [];
-    if (committedCount > 0)
+    if (committedCount > 0) {
       parts.push(
-        `Created ${committedCount} commit${committedCount > 1 ? "s" : ""}`,
+        t(runLang, "aggCommit.summaryCommitted", {
+          count: String(committedCount),
+        }),
       );
-    if (skippedCount > 0) parts.push(`${skippedCount} skipped`);
-    if (failedCount > 0) parts.push(`${failedCount} failed`);
+    }
+    if (skippedCount > 0) {
+      parts.push(
+        t(runLang, "aggCommit.summarySkipped", {
+          count: String(skippedCount),
+        }),
+      );
+    }
+    if (failedCount > 0) {
+      parts.push(
+        t(runLang, "aggCommit.summaryFailed", {
+          count: String(failedCount),
+        }),
+      );
+    }
 
     if (parts.length === 0) {
-      ctx.ui.notify("All commits failed", "error");
+      ctx.ui.notify(t(runLang, "aggCommit.summaryAllFailed"), "error");
     } else if (failedCount > 0) {
       ctx.ui.notify(parts.join(", "), "warning");
     } else {

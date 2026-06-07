@@ -79,14 +79,17 @@ class FooterManager {
     if (this.running) return;
 
     const enabled = getAutoAggCommit(this.cwd);
-    const onOff = enabled ? "on" : "off";
+    const lang = getLanguage(this.cwd);
 
     // Check if inside a git repository
     const { code } = await this.pi.exec("git", ["rev-parse", "--git-dir"], {
       cwd: this.cwd,
     });
     if (code !== 0) {
-      this.ui.setStatus(STATUS_KEY, `auto-commit: ${onOff}`);
+      this.ui.setStatus(
+        STATUS_KEY,
+        t(lang, "footer.autoCommit.off"),
+      );
       return;
     }
 
@@ -94,8 +97,19 @@ class FooterManager {
     const { stdout } = await this.pi.exec("git", ["status", "--porcelain"], {
       cwd: this.cwd,
     });
-    const state = stdout.trim().length > 0 ? "changed" : "clean";
-    this.ui.setStatus(STATUS_KEY, `auto-commit: ${onOff} (${state})`);
+    if (!enabled) {
+      this.ui.setStatus(STATUS_KEY, t(lang, "footer.autoCommit.off"));
+    } else if (stdout.trim().length > 0) {
+      this.ui.setStatus(
+        STATUS_KEY,
+        t(lang, "footer.autoCommit.onChanged"),
+      );
+    } else {
+      this.ui.setStatus(
+        STATUS_KEY,
+        t(lang, "footer.autoCommit.onClean"),
+      );
+    }
   }
 
   /**
