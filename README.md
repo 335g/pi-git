@@ -19,7 +19,7 @@ Or add to your project's package.json:
 ```json
 {
   "dependencies": {
-    "@335g/pi-git": "^0.0.3"
+    "@335g/pi-git": "^0.0.4"
   }
 }
 ```

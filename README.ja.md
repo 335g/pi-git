@@ -19,7 +19,7 @@ pi install @335g/pi-git
 ```json
 {
   "dependencies": {
-    "@335g/pi-git": "^0.0.3"
+    "@335g/pi-git": "^0.0.4"
   }
 }
 ```
