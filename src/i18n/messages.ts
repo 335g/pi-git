@@ -51,7 +51,8 @@ export const messages = {
     "aggCommit.summarySkipped": "{count} skipped",
     "aggCommit.summaryFailed": "{count} failed",
     "aggCommit.summaryAllFailed": "All commits failed",
-    "aggCommit.summaryAborted": "{remaining} hunks not attempted (staging reset failed)",
+    "aggCommit.summaryAborted":
+      "{remaining} hunks not attempted (staging reset failed)",
 
     // ── auto-agg-commit.ts ─────────────────────────────────────
     "autoAggCommit.help":
@@ -193,7 +194,8 @@ export const messages = {
     "aggCommit.summarySkipped": "{count}件スキップ",
     "aggCommit.summaryFailed": "{count}件失敗",
     "aggCommit.summaryAllFailed": "すべてのコミットが失敗しました",
-    "aggCommit.summaryAborted": "残り{remaining}件は未処理です（ステージングリセット失敗のため中断）",
+    "aggCommit.summaryAborted":
+      "残り{remaining}件は未処理です（ステージングリセット失敗のため中断）",
 
     // ── auto-agg-commit.ts ─────────────────────────────────────
     "autoAggCommit.help":

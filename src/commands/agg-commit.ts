@@ -122,7 +122,12 @@ async function commitHunks(
       ctx.ui.notify(t(runLang, "aggCommit.stagingResetFailed"), "error");
       failedCount++;
       const remaining = total - (i + 1);
-      return { committed: committedCount, failed: failedCount, skipped: skippedCount, aborted: remaining };
+      return {
+        committed: committedCount,
+        failed: failedCount,
+        skipped: skippedCount,
+        aborted: remaining,
+      };
     }
 
     try {

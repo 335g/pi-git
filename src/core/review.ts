@@ -68,6 +68,12 @@ class ReviewOverlay implements Component {
     this.lang = lang;
     this.unstagedFiles = unstagedFiles;
     this.done = done;
+
+    // Guard: empty hunk list — immediately resolve to avoid dead UI
+    if (hunks.length === 0) {
+      this.disposed = true;
+      this.done({ hunks: [], cancelled: false });
+    }
   }
 
   // ── Component interface ──────────────────────────────
@@ -106,13 +112,17 @@ class ReviewOverlay implements Component {
     const reservedLines = 3 + (this.unstagedFiles.length > 0 ? 2 : 0);
     const visibleHunks = Math.min(maxHunks, Math.max(4, 12 - reservedLines));
 
-    // Calculate scroll offset so selectedIndex is always visible
+    // Calculate scroll offset so selectedIndex is always visible.
+    // Skip offset computation when cursor is on the commit button
+    // (commit button is rendered outside the hunk scroll viewport).
     let scrollOffset = 0;
-    if (this.selectedIndex >= visibleHunks) {
-      scrollOffset = this.selectedIndex - visibleHunks + 1;
-    }
-    if (this.selectedIndex < scrollOffset) {
-      scrollOffset = this.selectedIndex;
+    if (this.selectedIndex < this.reviewedHunks.length) {
+      if (this.selectedIndex >= visibleHunks) {
+        scrollOffset = this.selectedIndex - visibleHunks + 1;
+      }
+      if (this.selectedIndex < scrollOffset) {
+        scrollOffset = this.selectedIndex;
+      }
     }
 
     // Render visible hunks
@@ -135,11 +145,11 @@ class ReviewOverlay implements Component {
       });
       const isSelected = this.selectedIndex === this.reviewedHunks.length;
       const prefix = isSelected ? "▶ " : "  ";
-      const padded = (prefix + btnText).padEnd(width, " ");
+      const padded = (prefix + btnText).substring(0, width).padEnd(width, " ");
       lines.push(padded);
     } else {
       const btnText = t(this.lang, "review.commitButtonNone");
-      const padded = ("  " + btnText).padEnd(width, " ");
+      const padded = ("  " + btnText).substring(0, width).padEnd(width, " ");
       lines.push(padded);
     }
 
@@ -292,6 +302,7 @@ class ReviewOverlay implements Component {
   // ── Commit / Cancel ───────────────────────────────────
 
   private confirm(): void {
+    if (this.disposed) return;
     // Enter only commits when the commit button is selected
     if (this.selectedIndex === this.reviewedHunks.length) {
       if (!this.hasIncludedHunks()) return;
