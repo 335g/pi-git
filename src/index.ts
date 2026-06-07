@@ -31,28 +31,62 @@ export default function (pi: ExtensionAPI) {
     description:
       "Auto stage and commit changes with AI-generated Conventional Commits messages",
     handler: async (args, ctx) => {
-      await handleAggCommit(pi, ctx, args);
+      try {
+        await handleAggCommit(pi, ctx, args);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (ctx.hasUI) {
+          ctx.ui.notify(`[pi-git] /git-agg-commit error: ${msg}`, "error");
+        }
+      }
     },
   });
 
   pi.registerCommand("git-config", {
     description: "Get, set, or list pi-git configuration values",
     handler: async (args, ctx) => {
-      await handleConfig(pi, ctx, args);
+      try {
+        await handleConfig(pi, ctx, args);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (ctx.hasUI) {
+          ctx.ui.notify(`[pi-git] /git-config error: ${msg}`, "error");
+        }
+      }
     },
   });
 
   pi.registerCommand("git-auto-agg-commit", {
     description: "Toggle automatic git-agg-commit after assistant responses",
     handler: async (args, ctx) => {
-      await handleAutoAggCommit(pi, ctx, args);
+      try {
+        await handleAutoAggCommit(pi, ctx, args);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (ctx.hasUI) {
+          ctx.ui.notify(
+            `[pi-git] /git-auto-agg-commit error: ${msg}`,
+            "error",
+          );
+        }
+      }
     },
   });
 
   pi.registerCommand("git-diagnostics", {
     description: "Show P0 effectiveness measurement counters",
     handler: async (args, ctx) => {
-      await handleDiagnostics(pi, ctx, args);
+      try {
+        await handleDiagnostics(pi, ctx, args);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (ctx.hasUI) {
+          ctx.ui.notify(
+            `[pi-git] /git-diagnostics error: ${msg}`,
+            "error",
+          );
+        }
+      }
     },
   });
 

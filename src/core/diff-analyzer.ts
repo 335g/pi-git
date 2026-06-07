@@ -11,7 +11,7 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
-import type { FileStats, Hunk } from "../types.js";
+import type { Hunk } from "../types.js";
 import { diagIncr } from "../utils/diagnostics.js";
 import { footerManager } from "../utils/footer-manager.js";
 import { t } from "../utils/lang.js";
@@ -386,37 +386,3 @@ function splitDiffByFile(fullDiff: string): Map<string, string[]> {
   return result;
 }
 
-/**
- * Parse addition/deletion counts for each file from a full diff.
- */
-function parseDiffStats(fullDiff: string): Map<string, FileStats> {
-  const result = new Map<string, FileStats>();
-  const lines = fullDiff.split("\n");
-  let currentFile: string | null = null;
-  let additions = 0;
-  let deletions = 0;
-
-  for (const line of lines) {
-    if (line.startsWith("diff --git")) {
-      if (currentFile) {
-        result.set(currentFile, { path: currentFile, additions, deletions });
-      }
-      const match = line.match(/diff --git a\/(.+?) b\/(.+?)$/);
-      if (match) {
-        currentFile = match[2];
-        additions = 0;
-        deletions = 0;
-      }
-    } else if (line.startsWith("+") && !line.startsWith("+++")) {
-      additions++;
-    } else if (line.startsWith("-") && !line.startsWith("---")) {
-      deletions++;
-    }
-  }
-
-  if (currentFile) {
-    result.set(currentFile, { path: currentFile, additions, deletions });
-  }
-
-  return result;
-}

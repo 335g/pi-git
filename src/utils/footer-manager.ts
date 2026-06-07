@@ -105,11 +105,11 @@ class FooterManager {
    * @param phase - Initial phase
    * @param lang - Optional language override (for --lang flag)
    */
-  async setRunning(
+  setRunning(
     command: string,
     phase: Phase,
     lang?: string,
-  ): Promise<void> {
+  ): void {
     if (!this.ui) return;
     this.running = { command, phase, lang, phaseStartedAt: Date.now() };
     this.startElapsedTimer();
@@ -123,7 +123,7 @@ class FooterManager {
    * @param phase - New phase
    * @param lang - Optional language override (for --lang flag)
    */
-  async setPhase(phase: Phase, lang?: string): Promise<void> {
+  setPhase(phase: Phase, lang?: string): void {
     if (!this.ui || !this.running) return;
     this.running.phase = phase;
     this.running.phaseStartedAt = Date.now();
@@ -140,7 +140,7 @@ class FooterManager {
    * @param current - Current hunk index (1-based)
    * @param total - Total number of hunks
    */
-  async setCommitProgress(current: number, total: number): Promise<void> {
+  setCommitProgress(current: number, total: number): void {
     if (!this.ui || !this.running) return;
     this.running.commitCurrent = current;
     this.running.commitTotal = total;

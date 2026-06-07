@@ -9,12 +9,6 @@ export interface Hunk {
   message: string;
 }
 
-export interface FileStats {
-  path: string;
-  additions: number;
-  deletions: number;
-}
-
 export interface AgentEndEvent {
   messages?: Array<{
     role: string;

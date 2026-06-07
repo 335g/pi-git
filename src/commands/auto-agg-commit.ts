@@ -19,10 +19,8 @@ import {
 } from "../utils/settings.js";
 import { footerManager } from "../utils/footer-manager.js";
 
-const P = "[pi-git]";
-
 export async function handleAutoAggCommit(
-  pi: ExtensionAPI,
+  _pi: ExtensionAPI,
   ctx: ExtensionCommandContext,
   args: string,
 ): Promise<void> {
@@ -81,7 +79,11 @@ export async function handleAutoAggCommit(
     saveGlobalSettings({ auto_agg_commit: next });
   }
 
-  await footerManager.refresh();
+  try {
+    await footerManager.refresh();
+  } catch {
+    // refresh failure shouldn't block the notification
+  }
 
   const statusText = t(lang, next ? "autoAggCommit.enabled" : "autoAggCommit.disabled");
   if (localPath) {

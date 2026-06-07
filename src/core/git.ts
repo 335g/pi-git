@@ -187,14 +187,19 @@ export async function collectDiff(
     // Diff was already captured via SHA, so even if pop fails, the stash
     // remains as an orphan — orphan recovery handles it next session_start.
     // But we must NOT proceed to commit if the working tree is corrupted.
-    const { code: popCode } = await pi.exec(
-      "git",
-      ["stash", "pop", "stash@{0}"],
-      { cwd },
-    );
-    if (popCode !== 0) {
-      // Pop failed (merge conflict, etc.).  The stash stays as an orphan.
-      // Signal the caller to abort — the working tree may be corrupted.
+    try {
+      const { code: popCode } = await pi.exec(
+        "git",
+        ["stash", "pop", "stash@{0}"],
+        { cwd },
+      );
+      if (popCode !== 0) {
+        // Pop failed (merge conflict, etc.).  The stash stays as an orphan.
+        // Signal the caller to abort — the working tree may be corrupted.
+        popFailed = true;
+      }
+    } catch {
+      // stash pop threw — treat as failure so caller aborts
       popFailed = true;
     }
   }
