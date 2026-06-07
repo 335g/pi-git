@@ -105,11 +105,7 @@ class FooterManager {
    * @param phase - Initial phase
    * @param lang - Optional language override (for --lang flag)
    */
-  setRunning(
-    command: string,
-    phase: Phase,
-    lang?: string,
-  ): void {
+  setRunning(command: string, phase: Phase, lang?: string): void {
     if (!this.ui) return;
     this.running = { command, phase, lang, phaseStartedAt: Date.now() };
     this.startElapsedTimer();
@@ -163,7 +159,9 @@ class FooterManager {
     if (!this.ui || !this.running) return;
     const lang = this.running.lang ?? getLanguage(this.cwd);
     const autoCommit = this.running.command === "auto-commit";
-    const elapsed = Math.floor((Date.now() - this.running.phaseStartedAt) / 1000);
+    const elapsed = Math.floor(
+      (Date.now() - this.running.phaseStartedAt) / 1000,
+    );
 
     let status = phaseStatusText(lang, this.running.phase, autoCommit);
 

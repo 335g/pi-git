@@ -64,10 +64,7 @@ export default function (pi: ExtensionAPI) {
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (ctx.hasUI) {
-          ctx.ui.notify(
-            `[pi-git] /git-auto-agg-commit error: ${msg}`,
-            "error",
-          );
+          ctx.ui.notify(`[pi-git] /git-auto-agg-commit error: ${msg}`, "error");
         }
       }
     },
@@ -81,10 +78,7 @@ export default function (pi: ExtensionAPI) {
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (ctx.hasUI) {
-          ctx.ui.notify(
-            `[pi-git] /git-diagnostics error: ${msg}`,
-            "error",
-          );
+          ctx.ui.notify(`[pi-git] /git-diagnostics error: ${msg}`, "error");
         }
       }
     },

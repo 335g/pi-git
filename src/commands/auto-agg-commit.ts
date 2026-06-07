@@ -33,12 +33,7 @@ export async function handleAutoAggCommit(
   const lang = getLanguage(ctx.cwd);
 
   if (trimmed === "--help") {
-    ctx.ui.notify(
-      t(lang,
-        "autoAggCommit.help",
-      ),
-      "info",
-    );
+    ctx.ui.notify(t(lang, "autoAggCommit.help"), "info");
     return;
   }
 
@@ -55,20 +50,17 @@ export async function handleAutoAggCommit(
       break;
     case "":
       ctx.ui.notify(
-        t(lang,
-          "autoAggCommit.status",
-          { status: t(lang, current ? "autoAggCommit.enabled" : "autoAggCommit.disabled") },
-        ),
+        t(lang, "autoAggCommit.status", {
+          status: t(
+            lang,
+            current ? "autoAggCommit.enabled" : "autoAggCommit.disabled",
+          ),
+        }),
         "info",
       );
       return;
     default:
-      ctx.ui.notify(
-        t(lang,
-          "autoAggCommit.invalidArg",
-        ),
-        "warning",
-      );
+      ctx.ui.notify(t(lang, "autoAggCommit.invalidArg"), "warning");
       return;
   }
 
@@ -85,21 +77,18 @@ export async function handleAutoAggCommit(
     // refresh failure shouldn't block the notification
   }
 
-  const statusText = t(lang, next ? "autoAggCommit.enabled" : "autoAggCommit.disabled");
+  const statusText = t(
+    lang,
+    next ? "autoAggCommit.enabled" : "autoAggCommit.disabled",
+  );
   if (localPath) {
     ctx.ui.notify(
-      t(lang,
-        "autoAggCommit.enabledLocal",
-        { status: statusText },
-      ),
+      t(lang, "autoAggCommit.enabledLocal", { status: statusText }),
       "info",
     );
   } else {
     ctx.ui.notify(
-      t(lang,
-        "autoAggCommit.enabledGlobal",
-        { status: statusText },
-      ),
+      t(lang, "autoAggCommit.enabledGlobal", { status: statusText }),
       "info",
     );
   }

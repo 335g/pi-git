@@ -6,8 +6,7 @@
  * and assistant's responses.
  */
 
-import type { Api, Context, Model } from "@earendil-works/pi-ai";
-import { completeSimple } from "@earendil-works/pi-ai";
+import { aiComplete } from "./ai.js";
 import type {
   ExtensionAPI,
   ExtensionContext,
@@ -16,7 +15,6 @@ import { diagIncr } from "../utils/diagnostics.js";
 import { t } from "../utils/lang.js";
 import { getLanguage } from "../utils/settings.js";
 import { sanitizeCommitMessage } from "./commit-message.js";
-import { resolveModel } from "./resolve-model.js";
 
 interface SimpleMessage {
   role: string;
@@ -126,8 +124,6 @@ function specificityScore(message: string): number {
  * Uses AI comparison when available; falls back to heuristic scoring.
  */
 async function refineMessageIfGeneric(
-  model: Model<Api>,
-  auth: { apiKey?: string; headers?: Record<string, string> },
   ctx: ExtensionContext,
   generatedMessage: string,
   messages: SimpleMessage[],
@@ -172,31 +168,19 @@ async function refineMessageIfGeneric(
       },
     );
 
-    const context: Context = {
+    const result = await aiComplete(ctx, {
       systemPrompt: t(lang, "autoCommitMsg.compareSystemPrompt"),
-      messages: [
-        {
-          role: "user",
-          content: comparisonPrompt,
-          timestamp: Date.now(),
-        },
-      ],
-    };
-
-    const result = await completeSimple(model, context, {
-      apiKey: auth.apiKey,
-      headers: auth.headers,
-      signal: ctx.signal,
-      reasoning: "minimal",
-      temperature: 0,
+      userMessage: comparisonPrompt,
       maxTokens: 100,
+      temperature: 0,
     });
 
-    const text = result.content
-      .filter((c): c is { type: "text"; text: string } => c.type === "text")
-      .map((c) => c.text)
-      .join("")
-      .trim()
+    if (!result) {
+      // AI unavailable — fall back to heuristic scoring
+      return userScore > genScore ? userCandidate : generatedMessage;
+    }
+
+    const text = result.text
       // Strip code fences if the model wraps the message
       .replace(/^```[a-z]*\n?/i, "")
       .replace(/\n?```$/i, "")
@@ -260,13 +244,6 @@ function collectMessagesByRole(
   return result;
 }
 
-/**
- * Count total characters across all collected messages for truncation budgeting.
- */
-function totalChars(collected: string[]): number {
-  return collected.reduce((sum, s) => sum + s.length, 0);
-}
-
 function buildPrompt(
   userMessages: string[],
   assistantMessages: string[],
@@ -324,16 +301,6 @@ export async function generateAutoCommitMessage(
 ): Promise<string> {
   const lang = getLanguage(ctx.cwd);
 
-  const model = resolveModel(ctx);
-  if (!model) {
-    return sanitizeCommitMessage(t(lang, "core.applyChanges"), changedFiles);
-  }
-
-  const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
-  if (!auth.ok) {
-    return sanitizeCommitMessage(t(lang, "core.applyChanges"), changedFiles);
-  }
-
   // Collect ALL user messages and assistant messages for rich context
   const userMessages = collectMessagesByRole(messages, "user");
   const assistantMessages = collectMessagesByRole(messages, "assistant");
@@ -343,37 +310,22 @@ export async function generateAutoCommitMessage(
   }
 
   try {
-    const promptContext: Context = {
+    const result = await aiComplete(ctx, {
       systemPrompt: getSystemPrompt(lang),
-      messages: [
-        {
-          role: "user",
-          content: buildPrompt(
-            userMessages,
-            assistantMessages,
-            changedFiles,
-            lang,
-          ),
-          timestamp: Date.now(),
-        },
-      ],
-    };
-
-    const result = await completeSimple(model, promptContext, {
-      apiKey: auth.apiKey,
-      headers: auth.headers,
-      signal: ctx.signal,
-      reasoning: "minimal",
+      userMessage: buildPrompt(
+        userMessages,
+        assistantMessages,
+        changedFiles,
+        lang,
+      ),
     });
 
-    const text = result.content
-      .filter((c): c is { type: "text"; text: string } => c.type === "text")
-      .map((c) => c.text)
-      .join("")
-      .trim();
+    if (!result) {
+      return sanitizeCommitMessage(t(lang, "core.applyChanges"), changedFiles);
+    }
 
     const commitMessage = sanitizeCommitMessage(
-      text || t(lang, "core.applyChanges"),
+      result.text || t(lang, "core.applyChanges"),
       changedFiles,
     );
 
@@ -381,8 +333,6 @@ export async function generateAutoCommitMessage(
     // candidate and pick the more specific one (heuristic → AI comparison)
     diagIncr("msgRefineTriggered");
     return await refineMessageIfGeneric(
-      model,
-      auth,
       ctx,
       commitMessage,
       messages,
