@@ -117,10 +117,7 @@ export async function handleAggCommit(
       try {
         await resetStaging(pi, ctx.cwd);
       } catch {
-        ctx.ui.notify(
-          t(runLang, "aggCommit.stagingResetFailed"),
-          "error",
-        );
+        ctx.ui.notify(t(runLang, "aggCommit.stagingResetFailed"), "error");
         failedCount++;
         break;
       }

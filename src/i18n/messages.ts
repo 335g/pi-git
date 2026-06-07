@@ -34,8 +34,7 @@ export const messages = {
       "Failed to reset staging area, aborting batch",
     "aggCommit.commitFailed":
       'Commit failed for "{message}" (exit code {exitCode})',
-    "aggCommit.langOverride":
-      "Language set to: {lang} (this run only)",
+    "aggCommit.langOverride": "Language set to: {lang} (this run only)",
     "aggCommit.summaryCommitted": "Created {count} commit(s)",
     "aggCommit.summarySkipped": "{count} skipped",
     "aggCommit.summaryFailed": "{count} failed",
@@ -163,8 +162,7 @@ export const messages = {
       "ステージングエリアのリセットに失敗しました。バッチを中断します",
     "aggCommit.commitFailed":
       'コミット失敗: "{message}" (終了コード {exitCode})',
-    "aggCommit.langOverride":
-      "言語を {lang} に設定しました（今回のみ）",
+    "aggCommit.langOverride": "言語を {lang} に設定しました（今回のみ）",
     "aggCommit.summaryCommitted": "{count}件のコミットを作成",
     "aggCommit.summarySkipped": "{count}件スキップ",
     "aggCommit.summaryFailed": "{count}件失敗",

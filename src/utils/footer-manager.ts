@@ -86,10 +86,7 @@ class FooterManager {
       cwd: this.cwd,
     });
     if (code !== 0) {
-      this.ui.setStatus(
-        STATUS_KEY,
-        t(lang, "footer.autoCommit.off"),
-      );
+      this.ui.setStatus(STATUS_KEY, t(lang, "footer.autoCommit.off"));
       return;
     }
 
@@ -100,15 +97,9 @@ class FooterManager {
     if (!enabled) {
       this.ui.setStatus(STATUS_KEY, t(lang, "footer.autoCommit.off"));
     } else if (stdout.trim().length > 0) {
-      this.ui.setStatus(
-        STATUS_KEY,
-        t(lang, "footer.autoCommit.onChanged"),
-      );
+      this.ui.setStatus(STATUS_KEY, t(lang, "footer.autoCommit.onChanged"));
     } else {
-      this.ui.setStatus(
-        STATUS_KEY,
-        t(lang, "footer.autoCommit.onClean"),
-      );
+      this.ui.setStatus(STATUS_KEY, t(lang, "footer.autoCommit.onClean"));
     }
   }
 
