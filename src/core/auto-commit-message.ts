@@ -229,8 +229,10 @@ async function refineMessageIfGeneric(
     });
 
     if (!result) {
-      // AI unavailable — fall back to heuristic scoring
-      return userScore > genScore ? userCandidate : generatedMessage;
+      // AI unavailable — keep generated message.
+      // User-derived candidates are unreliable without AI validation,
+      // and the generated message is the safer default for small models.
+      return generatedMessage;
     }
 
     const text = result.text.trim();
@@ -255,11 +257,12 @@ async function refineMessageIfGeneric(
       return generatedMessage;
     }
 
-    // Last resort: use heuristic scores
-    return userScore > genScore ? userCandidate : generatedMessage;
+    // AI couldn't decide — prefer generated message as safer default.
+    // Heuristic scoring is English-biased and unreliable for non-English.
+    return generatedMessage;
   } catch {
-    // AI failed — fall back to heuristic scoring
-    return userScore > genScore ? userCandidate : generatedMessage;
+    // AI failed — keep generated message (same reasoning as above)
+    return generatedMessage;
   }
 }
 
