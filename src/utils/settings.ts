@@ -26,6 +26,10 @@ export interface PiGitSettings {
   auto_agg_commit?: boolean;
   /** Model to use for diff analysis (format: "provider/model-id") */
   analysis_model?: string;
+  /** Maximum changed files to trigger auto-commit confirmation (0 = skip) */
+  auto_agg_commit_min_files?: number;
+  /** Maximum changed lines to trigger auto-commit confirmation (0 = skip) */
+  auto_agg_commit_min_lines?: number;
 }
 
 export type SettingOrigin = "default" | "global" | "local";
@@ -61,12 +65,26 @@ export const VALID_KEYS_META: KeyMeta[] = [
     messageKey: "config.keyDesc.analysis_model",
     valid_values: "e.g., anthropic/claude-3-5-sonnet-20241022",
   },
+  {
+    key: "auto_agg_commit_min_files",
+    type: "number",
+    messageKey: "config.keyDesc.auto_agg_commit_min_files",
+    valid_values: "non-negative integer (0 = skip files check)",
+  },
+  {
+    key: "auto_agg_commit_min_lines",
+    type: "number",
+    messageKey: "config.keyDesc.auto_agg_commit_min_lines",
+    valid_values: "non-negative integer (0 = skip lines check)",
+  },
 ];
 
 export const DEFAULT_SETTINGS: PiGitSettings = {
   lang: "en",
   auto_agg_commit: false,
   analysis_model: "",
+  auto_agg_commit_min_files: 2,
+  auto_agg_commit_min_lines: 10,
 };
 
 export const GLOBAL_CONFIG_DIR = join(homedir(), ".config", "pi-git");
@@ -230,6 +248,14 @@ export function getAutoAggCommit(cwd?: string): boolean {
 export function getAnalysisModel(cwd?: string): string | undefined {
   const model = getSettings(cwd).analysis_model;
   return model?.trim() ? model.trim() : undefined;
+}
+
+export function getAutoAggCommitMinFiles(cwd?: string): number {
+  return getSettings(cwd).auto_agg_commit_min_files ?? 2;
+}
+
+export function getAutoAggCommitMinLines(cwd?: string): number {
+  return getSettings(cwd).auto_agg_commit_min_lines ?? 10;
 }
 
 // ───────────────────────────────────────────────

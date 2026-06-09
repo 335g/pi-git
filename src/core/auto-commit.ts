@@ -4,21 +4,38 @@
  * Automatically commits changes after assistant response when enabled.
  */
 
+import { readFileSync } from "node:fs";
 import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import type { AgentEndEvent } from "../types.js";
 import { t } from "../utils/lang.js";
-import { getAutoAggCommit, getLanguage } from "../utils/settings.js";
+import {
+  getAutoAggCommit,
+  getAutoAggCommitMinFiles,
+  getAutoAggCommitMinLines,
+  getLanguage,
+} from "../utils/settings.js";
 import { footerManager } from "../utils/footer-manager.js";
 import { generateAutoCommitMessage } from "./auto-commit-message.js";
+import { createConfirmComponent } from "./auto-commit-confirm.js";
 import {
   hasChanges,
   isGitRepository,
   resetStaging,
   stageFiles,
 } from "./git.js";
+
+// ───────────────────────────────────────────────
+// Types
+// ───────────────────────────────────────────────
+
+interface ChangedLinesResult {
+  totalLines: number;
+  untrackedFiles: string[];
+  hasBinary: boolean;
+}
 
 /**
  * Handle auto-commit after agent response
@@ -56,32 +73,64 @@ export async function handleAutoCommit(
 
   const lang = getLanguage(ctx.cwd);
 
-  try {
-    await footerManager.setRunning("auto-commit", "generateMessage");
+  // ── Gather change info (before setRunning, so confirmation can appear first) ──
 
-    const { stdout: statusOutput } = await pi.exec(
-      "git",
-      ["status", "--short"],
-      { cwd: ctx.cwd },
-    );
+  const { stdout: statusOutput } = await pi.exec(
+    "git",
+    ["status", "--short"],
+    { cwd: ctx.cwd },
+  );
 
-    const changedFiles = statusOutput
-      .split("\n")
-      .filter(Boolean)
-      .map((line) => line.slice(3).trim())
-      .filter(Boolean);
+  const changedFiles = statusOutput
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => line.slice(3).trim())
+    .filter(Boolean);
 
-    if (changedFiles.length === 0) {
+  if (changedFiles.length === 0) {
+    return;
+  }
+
+  // Capture git diff for AI context (staged + unstaged changes vs HEAD)
+  const { stdout: diffOutput, code: diffCode } = await pi.exec(
+    "git",
+    ["diff", "HEAD", "--", ...changedFiles],
+    { cwd: ctx.cwd },
+  );
+  const diff = diffCode === 0 ? diffOutput : "";
+
+  // ── Count changed lines (for confirmation threshold) ──
+  const countResult = await countChangedLines(
+    pi,
+    ctx.cwd,
+    statusOutput,
+    changedFiles,
+  );
+
+  // ── Threshold check + confirmation dialog ──
+  const minFiles = getAutoAggCommitMinFiles(ctx.cwd);
+  const minLines = getAutoAggCommitMinLines(ctx.cwd);
+  const filesBelow = minFiles > 0 && changedFiles.length <= minFiles;
+  const linesBelow = minLines > 0 && countResult.totalLines <= minLines;
+
+  if (filesBelow || linesBelow) {
+    const confirmed = await showConfirmDialog(ctx, {
+      changedFiles,
+      untrackedFiles: countResult.untrackedFiles,
+      totalLines: countResult.totalLines,
+      hasBinary: countResult.hasBinary,
+      lang,
+    });
+    if (!confirmed) {
+      ctx.ui.notify(t(lang, "autoCommit.confirmSkipped"), "info");
       return;
     }
+  }
 
-    // Capture git diff for AI context (staged + unstaged changes vs HEAD)
-    const { stdout: diffOutput, code: diffCode } = await pi.exec(
-      "git",
-      ["diff", "HEAD", "--", ...changedFiles],
-      { cwd: ctx.cwd },
-    );
-    const diff = diffCode === 0 ? diffOutput : "";
+  // ── Proceed with auto-commit ──
+
+  try {
+    await footerManager.setRunning("auto-commit", "generateMessage");
 
     const messages = event.messages || [];
     const commitMessage = await generateAutoCommitMessage(
@@ -122,4 +171,119 @@ export async function handleAutoCommit(
   } finally {
     await footerManager.clearRunning();
   }
+}
+
+// ───────────────────────────────────────────────
+// Helper: count changed lines from git diff
+// ───────────────────────────────────────────────
+
+/**
+ * Count total changed lines across all changed files.
+ *
+ * Uses `git diff --numstat HEAD` for tracked files.
+ * For untracked (new) files, counts lines directly.
+ */
+async function countChangedLines(
+  pi: ExtensionAPI,
+  cwd: string,
+  statusOutput: string,
+  changedFiles: string[],
+): Promise<ChangedLinesResult> {
+  let totalLines = 0;
+  let hasBinary = false;
+
+  // 1. Tracked changes via --numstat
+  // Falls back gracefully if HEAD doesn't exist (first commit).
+  const { stdout: numstatOut } = await pi.exec(
+    "git",
+    ["diff", "--numstat", "HEAD", "--", ...changedFiles],
+    { cwd },
+  );
+
+  if (numstatOut.trim()) {
+    for (const line of numstatOut.trim().split("\n")) {
+      if (!line) continue;
+      const [added, deleted] = line.split("\t");
+      if (added === "-" || deleted === "-") {
+        // Binary file
+        hasBinary = true;
+        continue;
+      }
+      totalLines +=
+        (added ? parseInt(added, 10) || 0 : 0) +
+        (deleted ? parseInt(deleted, 10) || 0 : 0);
+    }
+  }
+
+  // 2. Untracked files — count lines directly
+  const untrackedFiles = statusOutput
+    .split("\n")
+    .filter((l) => l.startsWith("?"))
+    .map((l) => l.slice(3).trim())
+    .filter(Boolean);
+
+  if (untrackedFiles.length > 0) {
+    // Try wc -l first, fall back to fs.readFileSync
+    const { stdout: wcOut, code: wcCode } = await pi.exec(
+      "wc",
+      ["-l", "--", ...untrackedFiles],
+      { cwd },
+    );
+    if (wcCode === 0 && wcOut.trim()) {
+      // wc -l output: " 123 file.ts" or "0 file.ts"
+      for (const line of wcOut.trim().split("\n")) {
+        const match = line.match(/^\s*(\d+)/);
+        if (match) {
+          totalLines += parseInt(match[1], 10) || 0;
+        }
+      }
+    } else {
+      // wc unavailable — use fs.readFileSync fallback
+      for (const file of untrackedFiles) {
+        try {
+          const content = readFileSync(file, "utf-8");
+          totalLines +=
+            content.split("\n").length -
+            (content.endsWith("\n") ? 1 : 0);
+        } catch {
+          // Binary or unreadable — mark as binary
+          hasBinary = true;
+        }
+      }
+    }
+  }
+
+  return { totalLines, untrackedFiles, hasBinary };
+}
+
+// ───────────────────────────────────────────────
+// Helper: show confirmation dialog
+// ───────────────────────────────────────────────
+
+async function showConfirmDialog(
+  ctx: ExtensionContext,
+  params: {
+    changedFiles: string[];
+    untrackedFiles: string[];
+    totalLines: number;
+    hasBinary: boolean;
+    lang: string;
+  },
+): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    const handle = ctx.ui.custom<boolean>(
+      createConfirmComponent({
+        changedFiles: params.changedFiles,
+        untrackedFiles: params.untrackedFiles,
+        totalLines: params.totalLines,
+        hasBinary: params.hasBinary,
+        lang: params.lang,
+      }),
+      { overlay: true },
+    );
+
+    // ctx.ui.custom returns a Promise that resolves with the result.
+    // Forward it to our outer Promise.
+    handle.then((result) => resolve(result ?? false));
+  });
 }

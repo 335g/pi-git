@@ -105,10 +105,28 @@ export const messages = {
       "Whether to automatically run git-agg-commit after assistant response",
     "config.keyDesc.analysis_model":
       "AI model to use for diff analysis (format: model-id or provider/model-id)",
+    "config.keyDesc.auto_agg_commit_min_files":
+      "Maximum changed files to trigger confirmation (0 = skip files check)",
+    "config.keyDesc.auto_agg_commit_min_lines":
+      "Maximum changed lines to trigger confirmation (0 = skip lines check)",
 
     // ── auto-commit.ts ─────────────────────────────────────────
     "autoCommit.commitFailed": "Commit failed: {error}",
     "autoCommit.commitCreated": "Created commit: {message}",
+
+    // ── auto-commit-confirm.ts ─────────────────────────────────
+    "autoCommit.confirmTitle": "Confirm Auto-Commit",
+    "autoCommit.confirmBody":
+      "{files} file(s) changed ({lines}). Commit this change?",
+    "autoCommit.confirmBodyLines": "{count} lines",
+    "autoCommit.confirmBodyBinary": "binary",
+    "autoCommit.confirmYes": "Yes (Enter)",
+    "autoCommit.confirmNo": "No (Esc)",
+    "autoCommit.confirmMoreFiles": "...and {count} more files",
+    "autoCommit.confirmNewFile": "(new)",
+    "autoCommit.confirmSkipped": "Auto-commit skipped",
+    "autoCommit.confirmTimedOut":
+      "Auto-commit confirmation timed out — skipped",
 
     // ── diff-analyzer.ts: system prompt ────────────────────────
     "diffAnalyzer.systemPrompt":
@@ -252,10 +270,29 @@ export const messages = {
     "config.keyDesc.auto_agg_commit": "アシスタント応答後の自動コミット有無",
     "config.keyDesc.analysis_model":
       "diff分析に使用するAIモデル（形式: model-id または provider/model-id）",
+    "config.keyDesc.auto_agg_commit_min_files":
+      "確認をトリガーする最大変更ファイル数（0 = ファイル数チェックなし）",
+    "config.keyDesc.auto_agg_commit_min_lines":
+      "確認をトリガーする最大変更行数（0 = 行数チェックなし）",
 
     // ── auto-commit.ts ─────────────────────────────────────────
     "autoCommit.commitFailed": "コミットに失敗しました: {error}",
     "autoCommit.commitCreated": "コミットを作成しました: {message}",
+
+    // ── auto-commit-confirm.ts ─────────────────────────────────
+    "autoCommit.confirmTitle": "自動コミットの確認",
+    "autoCommit.confirmBody":
+      "{files}個のファイルを変更（{lines}）。コミットしますか？",
+    "autoCommit.confirmBodyLines": "{count}行",
+    "autoCommit.confirmBodyBinary": "バイナリ",
+    "autoCommit.confirmYes": "はい (Enter)",
+    "autoCommit.confirmNo": "いいえ (Esc)",
+    "autoCommit.confirmMoreFiles": "...他{count}ファイル",
+    "autoCommit.confirmNewFile": "（新規）",
+    "autoCommit.confirmSkipped":
+      "自動コミットをスキップしました",
+    "autoCommit.confirmTimedOut":
+      "自動コミット確認がタイムアウトしました — スキップ",
 
     // ── diff-analyzer.ts: system prompt ────────────────────────
     "diffAnalyzer.systemPrompt":
