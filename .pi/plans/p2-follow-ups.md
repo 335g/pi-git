@@ -1,7 +1,8 @@
 # P2 Implementation Plan: Small Model Commit Message — Follow-ups
 
 **Date:** 2026-06-11
-**Status:** Draft — Under Review
+**Status:** Final (v2) — Ready for Implementation
+**Review:** 1 P2 plan review → plan updated
 **Based on:** Plan v3 (P0/P1 implemented), source reviews (budget-truncation #3/#4, refinement-heuristics #6, prompt-engineering #7/#8)
 **Prerequisite:** P0 + P1 already implemented in `src/core/auto-commit-message.ts` and `src/i18n/messages.ts`
 
@@ -31,30 +32,37 @@ This produces syntactically invalid diff fragments. Small models already struggl
 
 ### Fix
 
-Add a `truncateDiffAtNewline` helper that cuts at newline boundaries, and use it for the diff section. Align with `diff-analyzer.ts`'s existing `truncateDiff` function (lines 198-202):
+**Don't create a new function.** `diff-analyzer.ts` already has a structurally identical `truncateDiff` function (line 193) that cuts at newline boundaries:
 
 ```typescript
-// In src/core/auto-commit-message.ts:
-
-/** Truncate diff content at a clean newline boundary (not mid-line) */
-function truncateDiffAtNewline(diff: string, maxChars: number): string {
-  if (diff.length <= maxChars) return diff;
-  const slice = diff.substring(0, maxChars);
+// diff-analyzer.ts:193-198 (EXISTING)
+function truncateDiff(diff: string, maxBytes: number): string {
+  if (diff.length <= maxBytes) return diff;
+  const slice = diff.substring(0, maxBytes);
   const lastNewline = slice.lastIndexOf("\n");
   return lastNewline > 0 ? slice.substring(0, lastNewline) : slice;
 }
 ```
 
-Then in `buildPrompt`, replace:
-```typescript
-diffSection = truncate(cleaned, MAX_DIFF_CHARS);
-```
-with:
-```typescript
-diffSection = truncateDiffAtNewline(cleaned, MAX_DIFF_CHARS);
+**Step 1:** Export `truncateDiff` from `diff-analyzer.ts`:
+```diff
+- function truncateDiff(diff: string, maxBytes: number): string {
++ export function truncateDiff(diff: string, maxBytes: number): string {
 ```
 
-**Changes:** ~10 lines, 1 call site change.
+**Step 2:** Import in `auto-commit-message.ts` (add to existing import):
+```diff
+- import { stripDiffNoise } from "./diff-analyzer.js";
++ import { stripDiffNoise, truncateDiff } from "./diff-analyzer.js";
+```
+
+**Step 3:** Replace in `buildPrompt`:
+```diff
+- diffSection = truncate(cleaned, MAX_DIFF_CHARS);
++ diffSection = truncateDiff(cleaned, MAX_DIFF_CHARS);
+```
+
+**Changes:** 3 lines across 2 files. No new function, no DRY violation.
 
 ---
 
@@ -81,15 +89,17 @@ In practice, these candidates typically lose in heuristic comparison to the AI-g
 Add English conversational markers to `isValidCommitSubject`:
 
 ```typescript
-/** English conversational markers similar to Japanese counterparts */
+/** English conversational markers — patterns a user message starts with */
 const CONVERSATIONAL_MARKERS_EN: RegExp[] = [
   /^(can|could|would|will)\s+you\s/i,
   /^please\s/i,
   /^(i|we)\s+(would\s+like|want|need)\s+(you\s+)?to\s/i,
-  /^(i'?d\s+like\s+(you\s+)?to)\s/i,
-  /^(add|fix|create|remove|update|change)\s+(a|an|the|some)\s/i,
+  /^(i'?d\s+like\s+(you\s+)?to\s)/i,
+  /^let'?s\s/i,
 ];
 ```
+
+> **Note:** The plan review identified that `/^(add|fix|create|remove|update|change)\s+(a|an|the|some)\s/i` would false-positive on legitimate descriptive subjects like `fix a null pointer` or `add a new endpoint`. This pattern is intentionally excluded. The conversational markers above (`can you`, `please`, `I'd like`, `let's`) catch the truly problematic chat patterns without false-positives.
 
 Update the function body:
 ```typescript
@@ -188,13 +198,86 @@ test("cleanCommitOutput handles Japanese fence info strings", () => {
 });
 ```
 
-**Note on test framework:** The project currently has no test infrastructure. Before adding tests, determine:
-- Use `node:test` (Node 18+, zero dependencies)
-- Or add `vitest` as devDependency (more features, watch mode)
+**Test infrastructure setup:**
 
-**Recommendation:** `node:test` for minimal overhead. Test file at `src/core/__tests__/auto-commit-message.test.ts`.
+The project has no existing test infrastructure. Use `node:test` (built into Node 18+, zero dependencies) with `tsx` as the TypeScript loader.
 
-**Changes:** ~150 lines (test file), ~10 lines (package.json if vitest). No source code changes.
+**Step 1:** Add dev dependency:
+```bash
+npm install --save-dev tsx
+```
+
+**Step 2:** Add `"test"` script to `package.json`:
+```json
+"scripts": {
+    "test": "node --import tsx --test src/**/*.test.ts",
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+}
+```
+
+**Step 3:** Exclude test files from build output in `tsconfig.json` (currently `include: ["src/**/*.ts"]` would compile tests into dist):
+```json
+"exclude": ["src/**/__tests__/**", "node_modules"]
+```
+
+**Missing test cases to add (from review gaps):**
+
+1. **English generic patterns for `isGenericMessage`**:
+```typescript
+test("isGenericMessage detects English generic patterns", () => {
+  expect(isGenericMessage("chore: apply changes")).toBe(true);
+  expect(isGenericMessage("chore: update files")).toBe(true);
+  expect(isGenericMessage("chore: commit changes")).toBe(true);
+});
+
+test("isGenericMessage allows specific English messages", () => {
+  expect(isGenericMessage("feat: add login form with validation")).toBe(false);
+  expect(isGenericMessage("fix: resolve null pointer in auth")).toBe(false);
+});
+```
+
+2. **`cleanCommitOutput` pass-through + multi-layer scenarios**:
+```typescript
+test("cleanCommitOutput passes through clean messages unchanged", () => {
+  expect(cleanCommitOutput("feat: add login form")).toBe("feat: add login form");
+});
+
+test("cleanCommitOutput handles nested wrappers (prefix in fences)", () => {
+  const input = "Sure! Here is the commit message:\n```\nfeat: add login\n```";
+  expect(cleanCommitOutput(input)).toBe("feat: add login");
+});
+
+test("cleanCommitOutput falls back to first line when no CC found", () => {
+  expect(cleanCommitOutput("This is just a chat message\nwith multiple lines"))
+    .toBe("This is just a chat message");
+});
+```
+
+3. **`specificityScore` smoke test**:
+```typescript
+test("specificityScore ranks specific messages higher than generic ones", () => {
+  const generic = specificityScore("chore: update files");
+  const specific = specificityScore("feat: implement JWT authentication for API");
+  expect(specific).toBeGreaterThan(generic);
+});
+```
+
+4. **`isValidCommitSubject` English markers** (if P2-2 is implemented):
+```typescript
+test("isValidCommitSubject rejects English conversational markers", () => {
+  expect(isValidCommitSubject("can you add login", "en")).toBe(false);
+  expect(isValidCommitSubject("please fix the bug", "en")).toBe(false);
+  expect(isValidCommitSubject("I'd like you to refactor auth", "en")).toBe(false);
+});
+
+test("isValidCommitSubject allows specific English subjects", () => {
+  expect(isValidCommitSubject("add login form", "en")).toBe(true);
+  expect(isValidCommitSubject("fix null pointer in auth", "en")).toBe(true);
+});
+```
+
+**Changes:** ~250 lines (test file), ~5 lines (package.json), 1 line (tsconfig.json). No source code changes.
 
 ---
 
@@ -228,9 +311,9 @@ export function sanitizeCommitMessage(
   // parseHunks), but this guards against future callers that forget.
   const firstLine = message
     .split("\n")
-    .map((l) => l.trim())
-    .find((l) => l.length > 0);
-  let sanitized = (firstLine || message).trim();
+    .find((l) => l.trim().length > 0)
+    ?.trim();
+  let sanitized = firstLine ?? message.trim();
   // ... rest of function unchanged
 ```
 
@@ -242,16 +325,19 @@ export function sanitizeCommitMessage(
 
 | File | P2 Item | Changes |
 |------|---------|---------|
-| `src/core/auto-commit-message.ts` | P2-1, P2-2 | ~30 lines (new function + constant + function body) |
-| `src/core/commit-message.ts` | P2-4 | ~5 lines |
-| `src/core/__tests__/auto-commit-message.test.ts` (new) | P2-3 | ~150 lines |
+| `src/core/auto-commit-message.ts` | P2-1, P2-2 | ~25 lines (import + constant + function body) |
+| `src/core/diff-analyzer.ts` | P2-1 | 1 line (export existing function) |
+| `src/core/commit-message.ts` | P2-4 | ~4 lines |
+| `src/core/__tests__/auto-commit-message.test.ts` (new) | P2-3 | ~250 lines |
+| `package.json` | P2-3 | ~5 lines (test script + tsx devDep) |
+| `tsconfig.json` | P2-3 | 1 line (exclude tests) |
 
 ## Risks
 
 | Risk | Mitigation |
 |------|-----------|
-| `truncateDiffAtNewline` may return empty string if `\n` not found before maxChars | Fallback to `slice` (same behavior as current `truncate` fallback) |
-| English conversational markers may false-positive | Patterns are anchored at `^` and use specific word sequences (`can you`, `could you`, `would you`). Legitimate commit messages don't start this way |
+| `truncateDiffAtNewline` may return empty string if `\n` not found before maxChars | Reuses existing `truncateDiff` from diff-analyzer.ts which has the same fallback to `slice` |
+| English conversational markers may false-positive | `add+article` pattern removed after review. Remaining patterns (`can you`, `please`, `I'd like`, `let's`) are anchored at `^` and don't false-positive on legitimate commit subjects |
 | Test framework choice may add unwanted dependency | `node:test` has zero dependencies and is built into Node 18+ |
 | `sanitizeCommitMessage` first-line extraction breaks callers expecting multi-line | No caller passes multi-line input intentionally. The change is semantically neutral for single-line input |
 
