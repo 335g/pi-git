@@ -145,7 +145,7 @@ export const messages = {
 
     // ── auto-commit-message.ts: system prompt ──────────────────
     "autoCommitMsg.systemPrompt":
-      "You are a commit message generator. From the following information, understand what changes were made and generate a single Conventional Commit message.\n\nThe GIT DIFF is the most reliable source of what actually changed. Use it as the primary driver for the commit message. The user's request provides intent, and the assistant's response and changed files list are supplementary.\n\nRules:\n- Choose type from: feat, fix, docs, style, refactor, test, chore\n- Write the subject in English\n- Keep subject under 50 characters\n- Use imperative mood\n- Include scope only if clearly inferable from the diff\n\nReturn ONLY the commit message string. No explanations or code fences.",
+      "You are a commit message generator. From the following information, understand what changes were made and generate a single Conventional Commit message.\n\nThe GIT DIFF is the most reliable source of what actually changed. Use it as the primary driver for the commit message. The user's request provides intent, and the assistant's response and changed files list are supplementary.\n\nRules:\n- Choose type from: feat, fix, docs, style, refactor, test, chore\n- Write the subject in English\n- Keep subject under 50 characters\n- Use imperative mood\n- Include scope only if clearly inferable from the diff\n\nExamples:\nUser: \"Add a login form to the auth page\" | Files: src/auth/login.tsx, src/auth/api.ts\n→ feat(auth): add login form\n\nUser: \"Fix the null pointer error in the payment flow\" | Files: src/payment/processor.ts\n→ fix(payment): add null check in processor\n\nReturn ONLY the commit message string. No explanations or code fences.",
 
     // ── auto-commit-message.ts: few-shot examples ──────────────
     "autoCommitMsg.examples":
@@ -153,7 +153,7 @@ export const messages = {
 
     // ── auto-commit-message.ts: user prompt ────────────────────
     "autoCommitMsg.buildPrompt":
-      "{examples}\n\n=== USER REQUEST ===\n{userSection}\n\n=== ASSISTANT RESPONSE ===\n{assistantSection}\n\n=== CHANGED FILES ===\n{filesSection}\n\n=== GIT DIFF ===\n{diffSection}\n\nBased on the GIT DIFF and USER REQUEST above, generate a single Conventional Commit message in English that best captures the intent of the changes.",
+      "=== USER REQUEST ===\n{userSection}\n\n=== ASSISTANT RESPONSE ===\n{assistantSection}\n\n=== CHANGED FILES ===\n{filesSection}\n\n=== GIT DIFF ===\n{diffSection}\n\nBased on the GIT DIFF and USER REQUEST above, generate a single Conventional Commit message in English that best captures the intent of the changes.",
 
     // ── auto-commit-message.ts: message comparison ─────────────
     "autoCommitMsg.compareSystemPrompt":
@@ -311,7 +311,7 @@ export const messages = {
 
     // ── auto-commit-message.ts: system prompt ──────────────────
     "autoCommitMsg.systemPrompt":
-      "あなたはコミットメッセージ生成ツールです。以下の情報から、どのような変更が行われたかを読み取り、Conventional Commit メッセージを1つ生成してください。\n\nGIT DIFF は実際に何が変更されたかを示す最も信頼できる情報源です。これを主軸にコミットメッセージを決定してください。ユーザーのリクエストは変更の意図を、アシスタントの応答と変更ファイル一覧は補完情報です。\n\nルール:\n- type は feat, fix, docs, style, refactor, test, chore から選択\n- サブジェクトは必ず日本語で記述する\n- サブジェクトは50文字以内\n- 命令形を使用する\n- スコープは推測できる場合のみ含める\n\n返答はメッセージ文字列のみ。説明やコードフェンスは不要。",
+      "あなたはコミットメッセージ生成ツールです。以下の情報から、どのような変更が行われたかを読み取り、Conventional Commit メッセージを1つ生成してください。\n\nGIT DIFF は実際に何が変更されたかを示す最も信頼できる情報源です。これを主軸にコミットメッセージを決定してください。ユーザーのリクエストは変更の意図を、アシスタントの応答と変更ファイル一覧は補完情報です。\n\nルール:\n- type は feat, fix, docs, style, refactor, test, chore から選択\n- サブジェクトは必ず日本語で記述する\n- サブジェクトは50文字以内\n- 命令形を使用する\n- スコープは推測できる場合のみ含める\n\n例:\nユーザーの依頼: 「認証ページにログインフォームを追加して」 | 変更ファイル: src/auth/login.tsx, src/auth/api.ts\n→ feat(auth): ログインフォームを追加\n\nユーザーの依頼: 「支払いフローのnullポインタエラーを修正して」 | 変更ファイル: src/payment/processor.ts\n→ fix(payment): nullチェックを追加\n\n返答はメッセージ文字列のみ。説明やコードフェンスは不要。",
 
     // ── auto-commit-message.ts: few-shot examples ──────────────
     "autoCommitMsg.examples":
@@ -319,7 +319,7 @@ export const messages = {
 
     // ── auto-commit-message.ts: user prompt ────────────────────
     "autoCommitMsg.buildPrompt":
-      "{examples}\n\n=== ユーザーのリクエスト ===\n{userSection}\n\n=== アシスタントの応答 ===\n{assistantSection}\n\n=== 変更されたファイル ===\n{filesSection}\n\n=== GIT DIFF ===\n{diffSection}\n\n上記の GIT DIFF とユーザーのリクエストを主軸に、変更の意図を最もよく表す Conventional Commit メッセージを1つ、**必ず日本語で**生成してください。",
+      "=== ユーザーのリクエスト ===\n{userSection}\n\n=== アシスタントの応答 ===\n{assistantSection}\n\n=== 変更されたファイル ===\n{filesSection}\n\n=== GIT DIFF ===\n{diffSection}\n\n上記の GIT DIFF とユーザーのリクエストを主軸に、変更の意図を最もよく表す Conventional Commit メッセージを1つ、**必ず日本語で**生成してください。",
 
     // ── auto-commit-message.ts: message comparison ─────────────
     "autoCommitMsg.compareSystemPrompt":

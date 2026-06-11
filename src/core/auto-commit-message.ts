@@ -14,8 +14,9 @@ import type {
 import { diagIncr } from "../utils/diagnostics.js";
 import { t } from "../utils/lang.js";
 import { getLanguage } from "../utils/settings.js";
-import { sanitizeCommitMessage } from "./commit-message.js";
+import { sanitizeCommitMessage, inferTypeFromFiles } from "./commit-message.js";
 import { stripDiffNoise } from "./diff-analyzer.js";
+import { resolveModel } from "./resolve-model.js";
 
 interface SimpleMessage {
   role: string;
@@ -34,13 +35,85 @@ function truncate(text: string, maxChars: number): string {
 
 /** Generic commit message patterns — messages matching these lack specificity */
 const GENERIC_MESSAGE_PATTERNS: RegExp[] = [
+  // English patterns
   /^chore:\s*apply\s*changes?\s*$/i,
   /^chore:\s*update\s*(files?)?\s*$/i,
   /^chore:\s*commit\s*changes?\s*$/i,
   /^chore:\s*modify\s*(files?)?\s*$/i,
   /^chore:\s*update\s+\S+\s*$/i,
   /^(feat|fix|chore|docs|style|refactor|test):\s*.{0,10}$/i,
+  // Japanese patterns
+  /^(feat|fix|chore|docs|style|refactor|test):\s*(変更|修正|更新|対応|追加|削除|改善|実装|作成|適用|反映|編集)(\s*(を|しました|しました。|を行いました|を実施|を反映|いたしました))?$/i,
+  /^chore:\s*(変更を適用|ファイルを更新|更新しました|修正しました)\s*$/i,
 ];
+
+/** Model ID patterns for cheap/small models — single source of truth */
+const CHEAP_MODEL_PATTERNS: RegExp[] = [
+  /mini/i,
+  /flash/i,
+  /nano/i,
+  /lite/i,
+  /small/i,
+  /haiku/i,
+];
+
+/** Check if a model ID indicates a small/cheap model */
+function isCheapModel(modelId: string): boolean {
+  return CHEAP_MODEL_PATTERNS.some((p) => p.test(modelId));
+}
+
+/** Determine budget tier for a model: small models get more assistant context */
+function getBudgetMultiplier(
+  modelId: string | undefined,
+): "small" | "large" {
+  if (!modelId) return "small"; // unknown model → conservative
+  return isCheapModel(modelId) ? "small" : "large";
+}
+
+/** Clean AI output: extract a Conventional Commit message from chatty model output */
+function cleanCommitOutput(raw: string): string {
+  let text = raw.trim();
+
+  // Layer 1: Extract from markdown fences (handles non-ASCII info strings)
+  const fenceMatch = text.match(/```(?:\w*)?\s*\n?([\s\S]*?)\n?```/);
+  if (fenceMatch) text = fenceMatch[1].trim();
+
+  // Layer 2: Strip common chat prefixes (English + Japanese)
+  const prefixPatterns = [
+    /^(?:here\s+is\s+(?:the\s+)?(?:commit\s+)?message[:\s]*)/i,
+    /^(?:commit\s+message[:\s]*)/i,
+    /^(?:the\s+commit\s+message\s+(?:is|should\s+be)[:\s]*)/i,
+    /^(?:sure!?\s*(?:here\s+is\s+)?[:\s]*)/i,
+    /^(?:提案するコミットメッセージ[:\s]*)/,
+    /^(?:コミットメッセージ[:\s]*)/,
+    /^(?:以下がコミットメッセージです[:\s]*)/,
+    /^(?:今回のコミット[:\s]*)/,
+    /^(?:以下のコミットメッセージを提案します[:\s]*)/,
+    /^(?:コミットメッセージを[作成生成]しました[:\s]*)/,
+    /^(?:はい[,、]\s*承知しました[。.]?\s*)/,
+  ];
+  for (const pat of prefixPatterns) {
+    text = text.replace(pat, "").trim();
+  }
+
+  // Layer 2.5: Strip wrapping backtick pairs (e.g., `feat: add login`)
+  text = text.replace(/^`([^`]+)`$/, "$1").trim();
+
+  // Layer 3: Find first line matching Conventional Commit
+  const lines = text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const ccLine = lines.find((l) =>
+    /^(feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert)(\(.+?\))?!?:\s/.test(
+      l,
+    ),
+  );
+  if (ccLine) return ccLine;
+
+  // Layer 4: Fall back to first non-empty line
+  return lines[0] || text;
+}
 
 /** Heuristic: is this commit message too generic to be useful? */
 function isGenericMessage(message: string): boolean {
@@ -154,12 +227,25 @@ function specificityScore(message: string, lang?: string): number {
   if (lang === "ja") {
     // Reward kanji density (proxy for semantic richness)
     const kanjiCount = (m.match(/[\u4e00-\u9faf]/g) || []).length;
-    score += Math.min(kanjiCount, 10) * 0.5;
+    score += Math.min(kanjiCount, 15) * 1.0;
     // Reward katakana technical terms (e.g. ログイン, バリデーション, リファクタ)
     const katakanaTerms = m.match(/[\u30a0-\u30ff]{2,}/g) || [];
-    score += katakanaTerms.length * 2;
+    score += katakanaTerms.length * 3;
+    // Reward Japanese concrete verbs (parallel to English concreteVerbs)
+    const japaneseConcreteVerbs =
+      /(追加|実装|作成|削除|修正|改善|整理|統合|分割|移行|更新|導入|廃止|対応|設定|構成|接続)/g;
+    score += (m.match(japaneseConcreteVerbs) || []).length * 2;
+    // Penalize Japanese generic filler (only at word boundaries)
+    const japaneseGenericWords =
+      /(変更|修正|更新|対応|適用|反映)(?!\S)/g;
+    const jpGenericCount = (m.match(japaneseGenericWords) || []).length;
+    score -= jpGenericCount * 2;
     // Penalize overly generic Japanese single-word subjects
-    if (/^(変更|修正|更新|対応|追加|削除|改善|実装|作成)$/.test(m.trim())) {
+    if (
+      /^(変更|修正|更新|対応|追加|削除|改善|実装|作成|適用|反映)$/.test(
+        m.trim(),
+      )
+    ) {
       score -= 4;
     }
   }
@@ -213,6 +299,13 @@ async function refineMessageIfGeneric(
   if (userScore > genScore + 5) return userCandidate;
   if (genScore > userScore + 5) return generatedMessage;
 
+  // Skip AI comparison for known-weak models — their judgment is unreliable.
+  // Use the higher heuristic score instead (balanced by specificityScore).
+  const model = resolveModel(ctx);
+  if (model && isCheapModel(model.id)) {
+    return userScore > genScore ? userCandidate : generatedMessage;
+  }
+
   // Scores are close — ask AI to decide
   diagIncr("msgRefineUsedAI");
   try {
@@ -243,6 +336,13 @@ async function refineMessageIfGeneric(
     const voteB = /\bB\b/i.test(text) && !/\bA\b/i.test(text);
     if (voteA) return generatedMessage;
     if (voteB) return userCandidate;
+
+    // Both appear — pick the one mentioned last ("Both are good, but B wins")
+    const aPos = text.search(/\bA\b/i);
+    const bPos = text.search(/\bB\b/i);
+    if (aPos >= 0 && bPos >= 0) {
+      return bPos > aPos ? userCandidate : generatedMessage;
+    }
 
     // Fallback: try substring matching (for models that echo the message)
     if (
@@ -308,36 +408,40 @@ function buildPrompt(
   changedFiles: string[],
   diff: string,
   lang: string,
+  modelId?: string,
 ): string {
-  // Budget: keep the whole prompt under ~8000 chars
+  // Budget: keep the whole prompt under ~8000 chars.
+  // Small models get more assistant context (they can't parse raw diffs well);
+  // large models keep the original diff-heavy allocation.
+  const budget = getBudgetMultiplier(modelId);
   const MAX_USER_CHARS = 1500;
-  const MAX_ASSISTANT_CHARS = 600;
+  const MAX_ASSISTANT_CHARS = budget === "small" ? 2500 : 600;
   const MAX_FILES_CHARS = 500;
-  const MAX_DIFF_CHARS = 5000;
+  const MAX_DIFF_CHARS = budget === "small" ? 3000 : 5000;
 
-  // Build user messages section (newest first, most relevant last in display)
+  // Build user messages section (newest first — most relevant context first)
   const userLines: string[] = [];
   let userBudget = MAX_USER_CHARS;
-  for (const msg of userMessages.reverse()) {
+  for (const msg of userMessages) {
     if (userBudget <= 0) break;
     const truncated = truncate(msg, userBudget);
     userLines.push(truncated);
     userBudget -= truncated.length;
   }
-  const userStr = userLines.reverse().join("\n---\n");
+  const userStr = userLines.join("\n---\n");
   const noData = t(lang, "autoCommitMsg.noData");
   const userSection = userStr || noData;
 
-  // Build assistant messages section
+  // Build assistant messages section (newest first)
   const assistantLines: string[] = [];
   let assistantBudget = MAX_ASSISTANT_CHARS;
-  for (const msg of assistantMessages.reverse()) {
+  for (const msg of assistantMessages) {
     if (assistantBudget <= 0) break;
     const truncated = truncate(msg, assistantBudget);
     assistantLines.push(truncated);
     assistantBudget -= truncated.length;
   }
-  const assistantStr = assistantLines.reverse().join("\n---\n");
+  const assistantStr = assistantLines.join("\n---\n");
   const assistantSection = assistantStr || noData;
 
   // Build files section
@@ -354,13 +458,24 @@ function buildPrompt(
   }
 
   const examples = t(lang, "autoCommitMsg.examples");
-  return t(lang, "autoCommitMsg.buildPrompt", {
+  const prompt = t(lang, "autoCommitMsg.buildPrompt", {
     userSection,
     assistantSection,
     filesSection,
     diffSection,
     examples,
   });
+
+  // Prepend type hints for small models (reuses inferTypeFromFiles from commit-message.ts)
+  const typeHint = buildTypeHintForMessage(changedFiles);
+  return typeHint + prompt;
+}
+
+/** Build a type hint string from changed file paths */
+function buildTypeHintForMessage(files: string[]): string {
+  const type = inferTypeFromFiles(files);
+  if (type === "chore") return ""; // skip if generic — let the AI decide
+  return `Hint: based on file paths, the likely commit type is "${type}".\n`;
 }
 
 export async function generateAutoCommitMessage(
@@ -381,6 +496,10 @@ export async function generateAutoCommitMessage(
   }
 
   try {
+    // Resolve model before aiComplete (same path aiComplete uses internally).
+    // Pass modelId to buildPrompt for budget gating.
+    const modelId = resolveModel(ctx)?.id;
+
     const result = await aiComplete(ctx, {
       systemPrompt: getSystemPrompt(lang),
       userMessage: buildPrompt(
@@ -389,17 +508,21 @@ export async function generateAutoCommitMessage(
         changedFiles,
         diff,
         lang,
+        modelId,
       ),
+      maxTokens: 200,
     });
 
     if (!result) {
       return sanitizeCommitMessage(t(lang, "core.applyChanges"), changedFiles);
     }
 
-    const commitMessage = sanitizeCommitMessage(
+    // Clean AI output before sanitization — small models often add chatty
+    // prefixes, markdown fences, or explanations around the actual message.
+    const cleaned = cleanCommitOutput(
       result.text || t(lang, "core.applyChanges"),
-      changedFiles,
     );
+    const commitMessage = sanitizeCommitMessage(cleaned, changedFiles);
 
     // If the generated message is too generic, compare with a user-message
     // candidate and pick the more specific one (heuristic → AI comparison)
