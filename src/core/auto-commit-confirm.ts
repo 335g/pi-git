@@ -5,7 +5,7 @@
  * giving the user a chance to review before committing.
  */
 
-import type { Component } from "@earendil-works/pi-tui";
+import { matchesKey, Key, type Component } from "@earendil-works/pi-tui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { t } from "../utils/lang.js";
 
@@ -85,13 +85,13 @@ class ConfirmOverlay implements Component {
     if (this.disposed) return;
 
     // Enter (submit)
-    if (data === "\r" || data === "\n") {
+    if (matchesKey(data, Key.enter)) {
       this.resolve(true);
       return;
     }
 
     // Escape
-    if (data === "\x1b" || data === "\x1b\x1b") {
+    if (matchesKey(data, Key.escape)) {
       this.resolve(false);
       return;
     }
