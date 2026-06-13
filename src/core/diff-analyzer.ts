@@ -410,7 +410,7 @@ function buildIntentPrompt(
  * Handles JSON objects with nested groups arrays.
  * Falls back gracefully on parse failures.
  */
-function parseHunkGroupingResult(text: string): HunkGroupingResult | null {
+export function parseHunkGroupingResult(text: string): HunkGroupingResult | null {
   let jsonText = text.trim();
 
   // Layer 1: Extract JSON from code fences
@@ -657,11 +657,15 @@ export function parseDiffHunks(fullDiff: string): DiffHunk[] {
         isNewFile: isNew,
         isDeletedFile: isDeleted,
         isAtomic: true,
+        fileHeader: extractFileHeader(lines),
       });
       continue;
     }
 
     // Regular hunks: assign per-file and global indices
+    // Extract file-level header lines (diff --git, ---, +++, index)
+    const fileHeaderLines = extractFileHeader(lines);
+
     for (let i = 0; i < hunks.length; i++) {
       const hunkLines = hunks[i];
       const headerLine = hunkLines[0];
@@ -697,11 +701,25 @@ export function parseDiffHunks(fullDiff: string): DiffHunk[] {
         isNewFile: lines.some((l) => l.startsWith("--- /dev/null")),
         isDeletedFile: lines.some((l) => l.startsWith("+++ /dev/null")),
         isAtomic: false,
+        fileHeader: fileHeaderLines,
       });
     }
   }
 
   return result;
+}
+
+/**
+ * Extract file-level diff header lines (before the first @@ hunk).
+ * These are needed to construct valid patches for git apply.
+ */
+function extractFileHeader(lines: string[]): string[] {
+  const header: string[] = [];
+  for (const line of lines) {
+    if (HUNK_HEADER_RE.test(line)) break;
+    header.push(line);
+  }
+  return header;
 }
 
 /**
