@@ -7,12 +7,11 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { AgentEndEvent } from "./types.js";
 import { handleAggCommit } from "./commands/agg-commit.js";
-
 import { handleConfig } from "./commands/config.js";
 import { handleDiagnostics } from "./commands/diagnostics.js";
-import { handleAutoCommit } from "./core/auto-commit.js";
 import { recoverOrphanedStashes } from "./core/orphan-recovery.js";
 import { turnLog } from "./core/turn-log.js";
+import { isGitRepository, hasChanges } from "./core/git.js";
 import { footerManager } from "./utils/footer-manager.js";
 
 export default function (pi: ExtensionAPI) {
@@ -74,10 +73,37 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("agent_end", async (event, ctx) => {
+    if (!ctx.hasUI) return;
+    if (footerManager.isRunning()) return;
+
     try {
-      await handleAutoCommit(pi, ctx, event as AgentEndEvent);
+      const isRepo = await isGitRepository(pi);
+      if (!isRepo) return;
+
+      if (!(await hasChanges(pi))) {
+        await footerManager.refresh();
+        return;
+      }
+
+      const { stdout } = await pi.exec("git", ["status", "--short"], {
+        cwd: ctx.cwd,
+      });
+
+      const changedFiles = stdout
+        .split("\n")
+        .filter(Boolean)
+        .map((line: string) => line.slice(3).trim())
+        .filter(Boolean);
+
+      if (changedFiles.length === 0) return;
+
+      turnLog.append(event as AgentEndEvent, changedFiles);
+      footerManager.setBatchStatus(
+        turnLog.turnCount,
+        turnLog.totalFilesChanged,
+      );
     } catch {
-      // Silently ignore auto-commit errors to prevent unhandled rejections
+      // Silently ignore errors
     }
   });
 }
