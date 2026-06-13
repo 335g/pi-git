@@ -107,6 +107,7 @@ export class TurnLog {
   initialize(cwd: string): void {
     this.repoRoot = this.resolveRepoRoot(cwd);
     if (this.repoRoot) {
+      this.ensureExcluded();
       this.loadFromDisk();
     } else {
       // Not in a git repo — start fresh, no persistence
@@ -266,6 +267,36 @@ export class TurnLog {
       }).trim() || null;
     } catch {
       return null;
+    }
+  }
+
+  /**
+   * Ensure .pi-git/ is in .git/info/exclude so turn-log.json
+   * doesn't get picked up by git stash and committed accidentally.
+   *
+   * Uses .git/info/exclude (not .gitignore) because it's:
+   * - Per-repo (no global side effects)
+   * - Not committed (doesn't modify the user's .gitignore)
+   * - Standard git practice for tool-generated files
+   */
+  private ensureExcluded(): void {
+    if (!this.repoRoot) return;
+    const excludePath = join(this.repoRoot, ".git", "info", "exclude");
+    const pattern = ".pi-git/";
+
+    try {
+      if (existsSync(excludePath)) {
+        const current = readFileSync(excludePath, "utf-8");
+        if (current.includes(pattern)) return; // already excluded
+        writeFileSync(excludePath, `${current.trimEnd()}\n${pattern}\n`, "utf-8");
+      } else {
+        // No exclude file yet — create one
+        mkdirSync(join(this.repoRoot, ".git", "info"), { recursive: true });
+        writeFileSync(excludePath, `${pattern}\n`, "utf-8");
+      }
+    } catch {
+      // Best-effort — if we can't write to exclude, TurnLog still works.
+      // The file may end up in git stash, but orphan recovery handles it.
     }
   }
 
