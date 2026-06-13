@@ -1,7 +1,9 @@
 # Design: メッセージログ蓄積 + バッチ Hunk コミット
 
-> **Status**: v2 — レビューフィードバック反映済み
-> **Reviewers**: Architecture (#1), Prompt Engineering (#2), UX & Settings (#3)
+> **Status**: Phase 1 実装完了 (2026-06-13)。auto-commit は削除し `/git-agg-commit` に一本化。
+> **実装済み**: TurnLog, batch-committer, /git-agg-commit TurnLog 統合
+> **削除済み**: per_turn 即時コミット, auto-commit 確認ダイアログ, 単一コミットメッセージ生成
+> **未実装**: Phase 2 (確認ダイアログ TurnLog 抜粋表示), Phase 3 (session_shutdown 自動コミット)
 
 ## 1. 問題定義
 
