@@ -1,11 +1,26 @@
 /**
- * TurnLog — session-scoped conversation log accumulator.
+ * TurnLog — session-scoped conversation log accumulator with disk persistence.
  *
- * Stores per-turn (user message, assistant excerpt, changed files) in memory.
+ * Stores per-turn (user message, assistant excerpt, changed files) in memory
+ * AND persists to `<repo-root>/.pi-git/turn-log.json` for survival across
+ * session reloads (Ctrl+R, pi restart).
+ *
  * Used by batch-committer to inject conversation context into the AI prompt
  * when splitting diffs into logical hunks.
+ *
+ * Persistence is best-effort: failures are silent and never block in-memory operation.
  */
 
+import { execSync } from "node:child_process";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { join } from "node:path";
 import type { AgentEndEvent } from "../types.js";
 import {
   type SimpleMessage,
@@ -15,7 +30,7 @@ import {
 } from "../utils/message-utils.js";
 
 /** One turn's worth of conversation context */
-interface TurnEntry {
+export interface TurnEntry {
   /** Turn index (1-based) */
   index: number;
   /** User's message — tail-truncated */
@@ -25,6 +40,17 @@ interface TurnEntry {
   /** Files changed during this turn (REQUIRED for AI correlation) */
   filesChanged: string[];
 }
+
+/** On-disk representation of TurnLog state */
+interface PersistedTurnLog {
+  version: number;
+  turnIndex: number;
+  warnNotified: boolean;
+  entries: TurnEntry[];
+}
+
+const TURN_LOG_FILE = "turn-log.json";
+const TURN_LOG_DIR = ".pi-git";
 
 /**
  * Session-scoped conversation log.
@@ -39,6 +65,9 @@ export class TurnLog {
   private entries: TurnEntry[] = [];
   private turnIndex = 0;
   private _warnNotified = false;
+
+  /** Git repo root — set by initialize(). null when not in a git repo. */
+  private repoRoot: string | null = null;
 
   get turnCount(): number {
     return this.entries.length;
@@ -58,11 +87,44 @@ export class TurnLog {
 
   set warnNotified(value: boolean) {
     this._warnNotified = value;
+    this.saveToDisk();
   }
+
+  // ───────────────────────────────────────────────
+  // Initialization
+  // ───────────────────────────────────────────────
+
+  /**
+   * Initialize TurnLog from persisted state.
+   *
+   * Synchronous — uses readFileSync to avoid races with agent_end
+   * (which could fire before an async initialize completes).
+   *
+   * - Resolves repo root from cwd
+   * - Loads turn-log.json if it exists
+   * - If not in a git repo, starts fresh (no persistence)
+   */
+  initialize(cwd: string): void {
+    this.repoRoot = this.resolveRepoRoot(cwd);
+    if (this.repoRoot) {
+      this.loadFromDisk();
+    } else {
+      // Not in a git repo — start fresh, no persistence
+      this.entries = [];
+      this.turnIndex = 0;
+      this._warnNotified = false;
+    }
+  }
+
+  // ───────────────────────────────────────────────
+  // Core operations
+  // ───────────────────────────────────────────────
 
   /**
    * Append a turn's conversation context.
-   * Called from handleAutoCommit() on every agent_end, regardless of mode.
+   * Called from agent_end handler on every turn.
+   *
+   * Persists to disk synchronously after appending (file is small, <20KB).
    */
   append(event: AgentEndEvent, changedFiles: string[]): void {
     this.turnIndex++;
@@ -94,6 +156,9 @@ export class TurnLog {
     if (this.entries.length > TurnLog.MAX_ENTRIES) {
       this.entries = this.entries.slice(-TurnLog.MAX_ENTRIES);
     }
+
+    // Persist to disk (synchronous — small file, once per turn)
+    this.saveToDisk();
   }
 
   /**
@@ -127,11 +192,169 @@ export class TurnLog {
     return lines.join("\n\n");
   }
 
-  /** Clear all entries (called after successful batch commit) */
+  /**
+   * Clear all entries (called after successful batch commit).
+   * Also deletes the persisted file.
+   */
   clear(): void {
     this.entries = [];
     this.turnIndex = 0;
     this._warnNotified = false;
+    this.deleteFromDisk();
+  }
+
+  // ───────────────────────────────────────────────
+  // Persistence (private)
+  // ───────────────────────────────────────────────
+
+  /**
+   * Resolve the git repo root from a working directory.
+   * Returns null if not in a git repo.
+   * Follows the same pattern as getLocalSettingsPath() in settings.ts.
+   */
+  private resolveRepoRoot(cwd: string): string | null {
+    try {
+      return execSync("git rev-parse --show-toplevel", {
+        cwd,
+        encoding: "utf-8",
+        stdio: ["pipe", "pipe", "ignore"],
+      }).trim() || null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Load entries from .pi-git/turn-log.json.
+   * Synchronous — consistent with loadJson/loadToml in settings.ts.
+   *
+   * Validates the shape and types of loaded data. Malformed data
+   * triggers a fresh start with a console warning.
+   */
+  private loadFromDisk(): void {
+    if (!this.repoRoot) return;
+
+    // Clean up stale temp file from a previous crash
+    const staleTmp = join(this.repoRoot, TURN_LOG_DIR, "turn-log.json.tmp");
+    try { unlinkSync(staleTmp); } catch { /* ignore */ }
+
+    const filePath = join(this.repoRoot, TURN_LOG_DIR, TURN_LOG_FILE);
+    if (!existsSync(filePath)) return;
+
+    let raw: string;
+    try {
+      raw = readFileSync(filePath, "utf-8");
+    } catch {
+      return; // read error → fresh start
+    }
+
+    if (!raw.trim()) return; // empty file → fresh start
+
+    let data: unknown;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      console.warn("[pi-git] Failed to parse turn-log.json — starting fresh");
+      return;
+    }
+
+    // ── Runtime type/shape validation ──
+    if (
+      typeof data !== "object" ||
+      data === null ||
+      Array.isArray(data)
+    ) {
+      console.warn("[pi-git] Invalid turn-log.json shape — starting fresh");
+      return;
+    }
+
+    const obj = data as Record<string, unknown>;
+
+    // Version check
+    if (obj.version !== 1) {
+      console.warn(
+        `[pi-git] Unsupported turn-log.json version: ${obj.version} — starting fresh`,
+      );
+      return;
+    }
+
+    // Validate entries array
+    if (!Array.isArray(obj.entries)) {
+      console.warn("[pi-git] turn-log.json entries is not an array — starting fresh");
+      return;
+    }
+
+    // Validate turnIndex
+    if (typeof obj.turnIndex !== "number" || !Number.isFinite(obj.turnIndex)) {
+      console.warn("[pi-git] turn-log.json turnIndex is invalid — starting fresh");
+      return;
+    }
+
+    // Filter valid entries (skip malformed ones gracefully)
+    const validEntries: TurnEntry[] = [];
+    for (const e of obj.entries) {
+      if (
+        typeof e === "object" &&
+        e !== null &&
+        typeof (e as TurnEntry).index === "number" &&
+        typeof (e as TurnEntry).userMessage === "string" &&
+        typeof (e as TurnEntry).assistantExcerpt === "string" &&
+        Array.isArray((e as TurnEntry).filesChanged) &&
+        (e as TurnEntry).filesChanged.every((f: unknown) => typeof f === "string")
+      ) {
+        validEntries.push(e as TurnEntry);
+      }
+      // Silently skip malformed entries
+    }
+
+    this.entries = validEntries.slice(-TurnLog.MAX_ENTRIES);
+    this.turnIndex = obj.turnIndex as number;
+    this._warnNotified = obj.warnNotified === true;
+  }
+
+  /**
+   * Write current state to .pi-git/turn-log.json.
+   * Uses atomic write (tmp file → rename) to prevent corruption on crash.
+   * Uses PID in tmp filename to avoid collisions with concurrent pi sessions.
+   */
+  private saveToDisk(): void {
+    if (!this.repoRoot) return;
+
+    const dir = join(this.repoRoot, TURN_LOG_DIR);
+    const finalPath = join(dir, TURN_LOG_FILE);
+    const tmpPath = join(dir, `turn-log.json.${process.pid}.tmp`);
+
+    try {
+      mkdirSync(dir, { recursive: true, mode: 0o755 });
+
+      const data: PersistedTurnLog = {
+        version: 1,
+        turnIndex: this.turnIndex,
+        warnNotified: this._warnNotified,
+        entries: this.entries,
+      };
+
+      writeFileSync(tmpPath, JSON.stringify(data, null, 2) + "\n", "utf-8");
+      renameSync(tmpPath, finalPath);
+    } catch {
+      // Silent — persistence failure is non-fatal.
+      // In-memory operation continues normally.
+    }
+  }
+
+  /**
+   * Remove .pi-git/turn-log.json.
+   * No-op if the file doesn't exist.
+   */
+  private deleteFromDisk(): void {
+    if (!this.repoRoot) return;
+
+    const filePath = join(this.repoRoot, TURN_LOG_DIR, TURN_LOG_FILE);
+    try {
+      unlinkSync(filePath);
+    } catch {
+      // File may not exist — that's fine
+    }
   }
 }
 
