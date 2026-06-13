@@ -18,7 +18,7 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_start", async (_event, ctx) => {
     try {
       if (ctx.hasUI) {
-        turnLog.clear(); // reset from previous session
+        turnLog.initialize(ctx.cwd); // load persisted TurnLog from disk
         footerManager.initialize(pi, ctx.ui, ctx.cwd);
         await recoverOrphanedStashes(pi, ctx);
         await footerManager.refresh();
