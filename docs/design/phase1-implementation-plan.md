@@ -1,7 +1,14 @@
 # Phase 1 実装プラン: TurnLog + accumulate モード + /git-agg-commit 拡張
 
 > **参照**: `docs/design/batch-commit-with-message-log.md` (v2)
-> **Status**: v2 — レビューフィードバック反映済み
+> **Status**: ✅ 実装完了 (2026-06-13)
+>
+> **実装時の計画からの変更点**:
+> - TurnLog をモジュールシングルトンに変更（`footerManager` と同じパターン）
+> - `isGenericMessage` を `commit-message.ts` に移動（循環 import 回避）
+> - `runReview` を `review.ts` に抽出し `runHunkReview` にリネーム
+> - `truncate` を `headTruncate` にリネーム（`tailTruncate` と対称に）
+> - `handleAggCommit` の `ctx` 型を `ExtensionCommandContext` に修正
 
 ## 概要
 
