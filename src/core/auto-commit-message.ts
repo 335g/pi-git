@@ -43,8 +43,8 @@ const GENERIC_MESSAGE_PATTERNS: RegExp[] = [
   /^chore:\s*update\s+\S+\s*$/i,
   /^(feat|fix|chore|docs|style|refactor|test):\s*[a-zA-Z0-9\s]{0,10}$/i,
   // Japanese patterns
-  /^(feat|fix|chore|docs|style|refactor|test):\s*(変更|修正|更新|対応|追加|削除|改善|実装|作成|適用|反映|編集)(\s*(を|しました|しました。|を行いました|を実施|を反映|いたしました))?$/i,
-  /^chore:\s*(変更を適用|ファイルを更新|更新しました|修正しました)\s*$/i,
+  /^(feat|fix|chore|docs|style|refactor|test):\s*(変更|修正|更新|対応|追加|削除|改善|実装|作成|適用|反映|編集)(\s*を\s*[\u3040-\u30ff\u4e00-\u9faf]{1,8})?(\s*(しました|しました。|を行いました|を実施|を反映|いたしました|します))?\s*$/i,
+  /^chore:\s*(変更を適用(?:しました)?|ファイルを更新(?:しました)?|更新しました|修正しました)\s*$/i,
 ];
 
 /** Model ID patterns for cheap/small models — single source of truth */
@@ -127,13 +127,13 @@ export function isGenericMessage(message: string): boolean {
  * be used verbatim as a commit subject.
  */
 const CONVERSATIONAL_MARKERS_JA: RegExp[] = [
-  /[てで]$/, // 「〜して」「〜で」終わり（未完了/列挙）
   /[。、．，]/, // 文中の句読点（複文の可能性）
   /してください|お願い|ます|です/, // 敬語残り
   /そして|あと|ついでに|あわせて/, // 列挙接続詞
   /も$/, // 「〜も」終わり（列挙の一部）
   /たり$/, // 「〜たり」終わり
   /など|とか/, // ぼかし表現
+  /かな[？?]?$/, // 疑問終助詞
 ];
 
 /**
@@ -174,8 +174,12 @@ export function userMessageToCandidate(userMessage: string): string {
     .replace(/[。.！!？?]$/, "")
     .replace(/お願いします$/, "")
     .replace(/してください$/, "")
+    .replace(/してほしい$/, "")
+    .replace(/してもらえますか$/, "")
+    .replace(/してくれますか$/, "")
     .replace(/して$/, "")
     .replace(/\bplease\b/gi, "")
+    .replace(/「|」/g, "")
     .replace(/\n/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -426,14 +430,14 @@ function buildPrompt(
   lang: string,
   modelId?: string,
 ): string {
-  // Budget: keep the whole prompt under ~8000 chars.
-  // Small models get more assistant context (they can't parse raw diffs well);
-  // large models keep the original diff-heavy allocation.
+  // Budget: keep the whole prompt under ~9000 chars.
+  // Diff is the primary driver per system prompt — always allocate more to diff.
+  // Assistant response is supplementary and often vague; keep it short.
   const budget = getBudgetMultiplier(modelId);
   const MAX_USER_CHARS = 1500;
-  const MAX_ASSISTANT_CHARS = budget === "small" ? 2500 : 600;
+  const MAX_ASSISTANT_CHARS = budget === "small" ? 600 : 800;
   const MAX_FILES_CHARS = 500;
-  const MAX_DIFF_CHARS = budget === "small" ? 3000 : 5000;
+  const MAX_DIFF_CHARS = 5000;
 
   // Build user messages section (newest first — most relevant context first)
   const userLines: string[] = [];
@@ -528,7 +532,7 @@ export async function generateAutoCommitMessage(
         lang,
         modelId,
       ),
-      maxTokens: isCheap ? 200 : 1024,
+      maxTokens: isCheap ? 400 : 1024,
     });
 
     if (!result) {
@@ -544,7 +548,6 @@ export async function generateAutoCommitMessage(
 
     // If the generated message is too generic, compare with a user-message
     // candidate and pick the more specific one (heuristic → AI comparison)
-    diagIncr("msgRefineTriggered");
     return await refineMessageIfGeneric(
       ctx,
       commitMessage,
@@ -553,6 +556,6 @@ export async function generateAutoCommitMessage(
       lang,
     );
   } catch {
-    return sanitizeCommitMessage("chore: apply changes", changedFiles);
+    return sanitizeCommitMessage(t(lang, "core.applyChanges"), changedFiles);
   }
 }

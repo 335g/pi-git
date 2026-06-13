@@ -1,11 +1,11 @@
 /**
  * Auto-commit confirmation dialog component.
  *
- * Shows an overlay Yes/No dialog when auto-commit changes are small,
- * giving the user a chance to review before committing.
+ * Renders a full-screen overlay (clears previous content, shows only dialog)
+ * when auto-commit changes need user confirmation.
  */
 
-import { matchesKey, Key, type Component } from "@earendil-works/pi-tui";
+import { matchesKey, Key, type Component, visibleWidth, truncateToWidth } from "@earendil-works/pi-tui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { t } from "../utils/lang.js";
 
@@ -15,9 +15,12 @@ const MAX_DISPLAY_FILES = 8;
 /** Timeout in ms before auto-dismissing as "No" */
 const CONFIRM_TIMEOUT_MS = 120_000;
 
+/** Maximum lines rendered for the full-screen overlay (safety cap for extreme terminals) */
+const MAX_RENDERED_LINES = 200;
+
 /** Factory returned by createConfirmComponent, compatible with ctx.ui.custom<T>() */
 export type ConfirmComponentFactory = (
-  tui: { requestRender: () => void },
+  tui: { requestRender: () => void; terminal?: { rows: number } },
   theme: Theme,
   _keybindings: unknown,
   done: (result: boolean) => void,
@@ -47,19 +50,25 @@ export function createConfirmComponent(
 }
 
 // ───────────────────────────────────────────────
-// ConfirmOverlay — the Yes/No overlay component
+// ConfirmOverlay — the full-screen Yes/No overlay
 // ───────────────────────────────────────────────
 
 class ConfirmOverlay implements Component {
   private disposed = false;
   private timeoutId: ReturnType<typeof setTimeout> | null = null;
+  private termHeight: number;
 
   constructor(
-    private tui: { requestRender: () => void },
+    private tui: { requestRender: () => void; terminal?: { rows: number } },
     private theme: Theme,
     private params: ConfirmDialogParams,
     private done: (result: boolean) => void,
   ) {
+    this.termHeight = Math.min(
+      tui.terminal?.rows ?? 24,
+      MAX_RENDERED_LINES,
+    );
+
     // Guard: empty file list — immediately resolve as if declined
     if (params.changedFiles.length === 0) {
       this.disposed = true;
@@ -96,6 +105,12 @@ class ConfirmOverlay implements Component {
       return;
     }
 
+    // Ctrl+C — treat as "No"
+    if (matchesKey(data, Key.ctrl("c"))) {
+      this.resolve(false);
+      return;
+    }
+
     // Printable keys: y / Y → yes, n / N → no
     if (data.length === 1) {
       const ch = data.toLowerCase();
@@ -113,14 +128,16 @@ class ConfirmOverlay implements Component {
   render(width: number): string[] {
     const { changedFiles, untrackedFiles, totalLines, hasBinary, lang } =
       this.params;
-    const lines: string[] = [];
+
+    // ── Build content lines (unstyled — styling applied during padding) ──
+    const content: string[] = [];
 
     // Title bar
     const title = t(lang, "autoCommit.confirmTitle");
-    const titleBar = `── ${title} `.padEnd(width, "─");
-    lines.push(this.theme.fg("accent", titleBar));
+    const titleBar = `── ${title} ──`;
+    content.push(this.theme.fg("accent", titleBar));
 
-    lines.push("");
+    content.push("");
 
     // Body: file count + line count
     const filesText = String(changedFiles.length);
@@ -132,46 +149,78 @@ class ConfirmOverlay implements Component {
         count: String(totalLines),
       });
     }
-    const bodyLine = t(lang, "autoCommit.confirmBody", {
-      files: filesText,
-      lines: linesText,
-    });
-    lines.push(bodyLine);
+    content.push(
+      t(lang, "autoCommit.confirmBody", {
+        files: filesText,
+        lines: linesText,
+      }),
+    );
 
-    lines.push("");
+    content.push("");
 
     // Files list
     if (changedFiles.length > 0) {
-      lines.push("Files:");
+      content.push("Files:");
       const displayCount = Math.min(changedFiles.length, MAX_DISPLAY_FILES);
       for (let i = 0; i < displayCount; i++) {
         const file = changedFiles[i]!;
         const isNew = untrackedFiles.includes(file);
         const newLabel = isNew ? ` ${t(lang, "autoCommit.confirmNewFile")}` : "";
-        // Truncate to width minus indent (2 spaces)
-        const maxLen = width - 2;
-        let display = `  ${file}${newLabel}`;
-        if (display.length > maxLen) {
-          display = display.substring(0, maxLen);
-        }
-        lines.push(this.theme.fg("muted", display));
+        const display = truncateToWidth(
+          `  ${file}${newLabel}`,
+          width - 4,
+          "\u2026",
+        );
+        content.push(this.theme.fg("muted", display));
       }
       if (changedFiles.length > MAX_DISPLAY_FILES) {
         const moreText = t(lang, "autoCommit.confirmMoreFiles", {
           count: String(changedFiles.length - MAX_DISPLAY_FILES),
         });
-        lines.push(this.theme.fg("dim", `  ${moreText}`));
+        content.push(this.theme.fg("dim", `  ${moreText}`));
       }
     }
 
-    lines.push("");
+    content.push("");
 
     // Key hints
     const yesText = t(lang, "autoCommit.confirmYes");
     const noText = t(lang, "autoCommit.confirmNo");
-    lines.push(
+    content.push(
       `  ${this.theme.fg("success", `[ ${yesText} ]`)}    ${this.theme.fg("warning", `[ ${noText} ]`)}`,
     );
+
+    // ── Frame: center content vertically, pad each line to full width ──
+    const lines: string[] = [];
+    const contentHeight = content.length;
+
+    // Top padding: vertical centering
+    // On very small terminals, pad=0 so content starts immediately
+    const topPad = Math.max(
+      0,
+      Math.floor((this.termHeight - contentHeight) / 2),
+    );
+
+    // Background fill helper
+    const fillBg = (text: string): string =>
+      this.theme.bg("selectedBg", text);
+
+    for (let i = 0; i < topPad; i++) {
+      lines.push(fillBg(" ".repeat(width)));
+    }
+
+    // Content lines: center horizontally, pad to full width
+    for (const line of content) {
+      const visW = visibleWidth(line);
+      const leftPad = Math.max(0, Math.floor((width - visW) / 2));
+      const padded = " ".repeat(leftPad) + line;
+      lines.push(fillBg(padded.padEnd(width, " ")));
+    }
+
+    // Bottom padding: fill remaining terminal height
+    while (lines.length < this.termHeight) {
+      lines.push(fillBg(" ".repeat(width)));
+    }
 
     return lines;
   }

@@ -59,9 +59,23 @@ describe("isGenericMessage", () => {
       assert.equal(isGenericMessage("fix: 修正しました。"), true);
     });
 
-    it("detects generic Japanese messages without polite endings", () => {
+    it("detects generic Japanese ○○を△△しました patterns", () => {
+      // These were the exact false negatives that caused the bug
+      assert.equal(isGenericMessage("chore: 変更を適用しました"), true);
+      assert.equal(isGenericMessage("chore: 修正を行いました"), true);
+      assert.equal(isGenericMessage("chore: 更新を実施しました"), true);
+      assert.equal(isGenericMessage("chore: 変更を反映しました"), true);
+    });
+
+    it("detects generic Japanese ○○を△△ (without しました)", () => {
       assert.equal(isGenericMessage("chore: 変更を適用"), true);
       assert.equal(isGenericMessage("chore: ファイルを更新"), true);
+      assert.equal(isGenericMessage("chore: ファイルを更新しました"), true);
+    });
+
+    it("detects generic Japanese ○○します", () => {
+      assert.equal(isGenericMessage("chore: 修正します"), true);
+      assert.equal(isGenericMessage("chore: 更新します"), true);
     });
 
     it("detects bare generic Japanese words with CC prefix", () => {
@@ -238,9 +252,25 @@ describe("userMessageToCandidate", () => {
     assert.ok(!result.includes("ください"));
   });
 
-  it("strips please", () => {
-    const result = userMessageToCandidate("please fix the bug");
-    assert.ok(!result.includes("please"));
+  it("strips してほしい / してもらえますか / してくれますか", () => {
+    const r1 = userMessageToCandidate("バグを修正してほしい");
+    assert.ok(r1.startsWith("fix:"));
+    assert.ok(!r1.includes("してほしい"));
+
+    const r2 = userMessageToCandidate("エラーを修正してもらえますか");
+    assert.ok(r2.startsWith("fix:"));
+    assert.ok(!r2.includes("してもらえますか"));
+
+    const r3 = userMessageToCandidate("機能を追加してくれますか");
+    assert.ok(r3.startsWith("feat:"));
+    assert.ok(!r3.includes("してくれますか"));
+  });
+
+  it("strips Japanese quotation marks 「」", () => {
+    const result = userMessageToCandidate("「ログイン機能」を追加してください");
+    assert.ok(!result.includes("「"));
+    assert.ok(!result.includes("」"));
+    assert.ok(result.includes("ログイン機能を追加"));
   });
 
   it("returns empty string for empty input", () => {
@@ -296,6 +326,21 @@ describe("isValidCommitSubject", () => {
         false,
       );
       assert.equal(isValidCommitSubject("修正をお願いします", "ja"), false);
+      assert.equal(isValidCommitSubject("ログインを追加かな？", "ja"), false);
+      assert.equal(isValidCommitSubject("修正かな", "ja"), false);
+    });
+
+    it("allows subjects previously blocked by て/で ending", () => {
+      // After removing /[てで]$/ from CONVERSATIONAL_MARKERS_JA,
+      // subjects ending in て/で are no longer rejected
+      assert.equal(
+        isValidCommitSubject("ログインフォームを追加して", "ja"),
+        true,
+      );
+      assert.equal(
+        isValidCommitSubject("nullチェックを追加", "ja"),
+        true,
+      );
     });
 
     it("allows specific subjects", () => {

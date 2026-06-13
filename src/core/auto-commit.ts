@@ -20,6 +20,7 @@ import {
 import { footerManager } from "../utils/footer-manager.js";
 import { generateAutoCommitMessage } from "./auto-commit-message.js";
 import { createConfirmComponent } from "./auto-commit-confirm.js";
+import type { OverlayOptions } from "@earendil-works/pi-tui";
 import {
   hasChanges,
   isGitRepository,
@@ -282,6 +283,14 @@ async function showConfirmDialog(
   },
 ): Promise<boolean> {
   return new Promise<boolean>((resolve) => {
+    const fullScreenOptions: OverlayOptions = {
+      width: "100%",
+      maxHeight: "100%",
+      row: 0,
+      col: 0,
+      margin: 0,
+    };
+
     const handle = ctx.ui.custom<boolean>(
       createConfirmComponent({
         changedFiles: params.changedFiles,
@@ -290,11 +299,14 @@ async function showConfirmDialog(
         hasBinary: params.hasBinary,
         lang: params.lang,
       }),
-      { overlay: true },
+      {
+        overlay: true,
+        overlayOptions: fullScreenOptions,
+      },
     );
 
     // ctx.ui.custom returns a Promise that resolves with the result.
     // Forward it to our outer Promise.
-    handle.then((result) => resolve(result ?? false));
+    handle.then((result) => resolve(result));
   });
 }
