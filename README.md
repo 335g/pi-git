@@ -43,7 +43,7 @@ pi install /path/to/pi-git
 | Command | Description |
 |---------|-------------|
 | [`/git-agg-commit`](#git-agg-commit) | Auto stage and commit changes with AI-generated Conventional Commits messages |
-| [`/git-auto-agg-commit`](#git-auto-agg-commit) | Toggle automatic `git-agg-commit` after assistant responses |
+
 | [`/git-config`](#git-config) | Get, set, or list pi-git configuration values |
 
 ### `/git-agg-commit`
@@ -52,14 +52,6 @@ Automatically analyzes the working tree diff, splits changes into logical hunks,
 
 ```
 /git-agg-commit [--lang=<code>]
-```
-
-### `/git-auto-agg-commit`
-
-Toggles automatic `git-agg-commit` after assistant responses. When enabled, uncommitted changes are automatically committed when the assistant finishes responding.
-
-```
-/git-auto-agg-commit [on|off|toggle]
 ```
 
 ### `/git-config`

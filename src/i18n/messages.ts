@@ -54,18 +54,7 @@ export const messages = {
     "aggCommit.summaryAborted":
       "{remaining} hunks not attempted (staging reset failed)",
 
-    // ── auto-agg-commit.ts ─────────────────────────────────────
-    "autoAggCommit.help":
-      "/git-auto-agg-commit [on|off|toggle] [--help]\n\nSubcommands:\n  on      Enable auto git-agg-commit\n  off     Disable auto git-agg-commit\n  toggle  Toggle auto git-agg-commit\n\nFlags:\n  --help  Show this help message\n\nWhen called without arguments, shows the current status.",
-    "autoAggCommit.status": "[pi-git] Auto git-agg-commit is {status}",
-    "autoAggCommit.enabled": "enabled",
-    "autoAggCommit.disabled": "disabled",
-    "autoAggCommit.invalidArg":
-      '[pi-git] Invalid argument. Use "on", "off", or "toggle"',
-    "autoAggCommit.enabledLocal":
-      "[pi-git] Auto git-agg-commit {status} (local config)",
-    "autoAggCommit.enabledGlobal":
-      "[pi-git] Auto git-agg-commit {status} (global config — outside git repo)",
+
 
     // ── config.ts ──────────────────────────────────────────────
     "config.help":
@@ -223,18 +212,7 @@ export const messages = {
     "aggCommit.summaryAborted":
       "残り{remaining}件は未処理です（ステージングリセット失敗のため中断）",
 
-    // ── auto-agg-commit.ts ─────────────────────────────────────
-    "autoAggCommit.help":
-      "/git-auto-agg-commit [on|off|toggle] [--help]\n\nサブコマンド:\n  on      自動 git-agg-commit を有効にする\n  off     自動 git-agg-commit を無効にする\n  toggle  自動 git-agg-commit の有効/無効を切り替える\n\nフラグ:\n  --help  このヘルプを表示\n\n引数を省略すると、現在の状態を表示します。",
-    "autoAggCommit.status": "[pi-git] 自動 git-agg-commit は{status}です",
-    "autoAggCommit.enabled": "有効",
-    "autoAggCommit.disabled": "無効",
-    "autoAggCommit.invalidArg":
-      "[pi-git] 引数が不正です。on, off, toggle のいずれかを指定してください",
-    "autoAggCommit.enabledLocal":
-      "[pi-git] 自動 git-agg-commit を{status}にしました（ローカル設定）",
-    "autoAggCommit.enabledGlobal":
-      "[pi-git] 自動 git-agg-commit を{status}にしました（グローバル設定 — Gitリポジトリ外のため）",
+
 
     // ── config.ts ──────────────────────────────────────────────
     "config.help":

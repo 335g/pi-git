@@ -7,7 +7,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { AgentEndEvent } from "./types.js";
 import { handleAggCommit } from "./commands/agg-commit.js";
-import { handleAutoAggCommit } from "./commands/auto-agg-commit.js";
+
 import { handleConfig } from "./commands/config.js";
 import { handleDiagnostics } from "./commands/diagnostics.js";
 import { handleAutoCommit } from "./core/auto-commit.js";
@@ -56,19 +56,6 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
-  pi.registerCommand("git-auto-agg-commit", {
-    description: "Toggle automatic git-agg-commit after assistant responses",
-    handler: async (args, ctx) => {
-      try {
-        await handleAutoAggCommit(pi, ctx, args);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        if (ctx.hasUI) {
-          ctx.ui.notify(`[pi-git] /git-auto-agg-commit error: ${msg}`, "error");
-        }
-      }
-    },
-  });
 
   pi.registerCommand("git-diagnostics", {
     description: "Show P0 effectiveness measurement counters",

@@ -62,29 +62,6 @@ Types are automatically inferred by AI, then validated to one of: `feat`, `fix`,
 
 ---
 
-## `/git-auto-agg-commit`
-
-Toggle the automatic `git-agg-commit` feature. When enabled, `pi-git` automatically runs `/git-agg-commit` after the assistant finishes responding if there are uncommitted changes in the working tree.
-
-### Usage
-
-```
-/git-auto-agg-commit         # Show current status
-/git-auto-agg-commit on      # Enable
-/git-auto-agg-commit off     # Disable
-/git-auto-agg-commit toggle  # Toggle
-/git-auto-agg-commit --help  # Show help
-```
-
-### Behavior
-
-- Saves the setting to the **local** config (`<repo-root>/pi-git.toml`) when inside a git repository, or the **global** config (`~/.config/pi-git/settings.json`) as a fallback when outside a repo.
-- Updates the persistent footer indicator `auto-commit: on (clean)` or `auto-commit: on (changed)` based on working tree state when enabled.
-- The auto-commit trigger fires on the `agent_end` event.
-- Does not run if another `/git-agg-commit` is already in progress.
-
----
-
 ## `/git-config`
 
 Get, set, or list `pi-git` configuration values. Supports both global and local scopes.

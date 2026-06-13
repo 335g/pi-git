@@ -43,7 +43,7 @@ pi install /path/to/pi-git
 | コマンド | 説明 |
 |---------|------|
 | [`/git-agg-commit`](#git-agg-commit) | 変更を自動ステージングし、AI生成のConventional Commitsメッセージでコミット |
-| [`/git-auto-agg-commit`](#git-auto-agg-commit) | アシスタント応答後の自動 `git-agg-commit` をトグル |
+
 | [`/git-config`](#git-config) | pi-git の設定値を取得・設定・一覧表示 |
 
 ### `/git-agg-commit`
@@ -52,14 +52,6 @@ pi install /path/to/pi-git
 
 ```
 /git-agg-commit [--lang=<code>]
-```
-
-### `/git-auto-agg-commit`
-
-アシスタント応答後の自動 `git-agg-commit` をトグルします。有効時は、アシスタントの応答完了時に未コミットの変更が自動的にコミットされます。
-
-```
-/git-auto-agg-commit [on|off|toggle]
 ```
 
 ### `/git-config`
