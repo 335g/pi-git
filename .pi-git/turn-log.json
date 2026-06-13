@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "turnIndex": 1,
+  "warnNotified": false,
+  "entries": [
+    {
+      "index": 1,
+      "userMessage": "",
+      "assistantExcerpt": "--- ## 実装完了サマリー 以下の7フェーズすべての実装が完了しました。 ### 変更したファイル | ファイル | 変更内容 | |---------|---------| | `src/types.ts` | `DiffHunk`, `DiffHunkRef`, `CommitGroup`, `HunkGroupingResult` 型を追加 | | `src/core/turn-log.ts` | `formatForPrompt()` を【依頼】【応答】【ファイル】の構造化フォーマットに変更。`newFilesThisTurn`/`continuedFilesThisTurn` を",
+      "filesChanged": [
+        "src/core/batch-committer.ts",
+        "src/core/commit-hunks.ts",
+        "src/core/diff-analyzer.ts",
+        "src/core/git.ts",
+        "src/core/turn-log.ts",
+        "src/i18n/messages.ts",
+        "src/types.ts",
+        ".pi/todos/1932ba32.md",
+        ".pi/todos/2147f6ae.md",
+        ".pi/todos/67ce0a57.md",
+        ".pi/todos/80fe5b1b.md",
+        ".pi/todos/a8a03345.md",
+        ".pi/todos/cbcfa7ed.md",
+        ".pi/todos/fd38d65b.md"
+      ]
+    }
+  ]
+}
