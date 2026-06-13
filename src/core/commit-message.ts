@@ -8,6 +8,27 @@
 import { diagIncr } from "../utils/diagnostics.js";
 import type { Hunk } from "../types.js";
 
+/** Generic commit message patterns — messages matching these lack specificity */
+export const GENERIC_MESSAGE_PATTERNS: RegExp[] = [
+  // English patterns
+  /^chore:\s*apply\s*changes?\s*$/i,
+  /^chore:\s*update\s*(files?)?\s*$/i,
+  /^chore:\s*commit\s*changes?\s*$/i,
+  /^chore:\s*modify\s*(files?)?\s*$/i,
+  /^chore:\s*update\s+\S+\s*$/i,
+  /^(feat|fix|chore|docs|style|refactor|test):\s*[a-zA-Z0-9\s]{0,10}$/i,
+  // Japanese patterns
+  /^(feat|fix|chore|docs|style|refactor|test):\s*(変更|修正|更新|対応|追加|削除|改善|実装|作成|適用|反映|編集)(\s*を\s*[\u3040-\u30ff\u4e00-\u9faf]{1,8})?(\s*(しました|しました。|を行いました|を実施|を反映|いたしました|します))?\s*$/i,
+  /^chore:\s*(変更を適用(?:しました)?|ファイルを更新(?:しました)?|更新しました|修正しました)\s*$/i,
+];
+
+/** Heuristic: is this commit message too generic to be useful? */
+export function isGenericMessage(message: string): boolean {
+  const m = message.trim();
+  if (m.length < 12) return true;
+  return GENERIC_MESSAGE_PATTERNS.some((p) => p.test(m));
+}
+
 /** Valid Conventional Commits types */
 const VALID_TYPES = [
   "feat",

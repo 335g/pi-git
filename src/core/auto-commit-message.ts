@@ -14,38 +14,22 @@ import type {
 import { diagIncr } from "../utils/diagnostics.js";
 import { t } from "../utils/lang.js";
 import { getLanguage } from "../utils/settings.js";
-import { sanitizeCommitMessage, inferTypeFromFiles } from "./commit-message.js";
+import {
+  sanitizeCommitMessage,
+  inferTypeFromFiles,
+  isGenericMessage,
+} from "./commit-message.js";
+
+// Re-export isGenericMessage for backward compatibility with tests
+export { isGenericMessage };
 import { stripDiffNoise, truncateDiff } from "./diff-analyzer.js";
 import { resolveModel } from "./resolve-model.js";
-
-interface SimpleMessage {
-  role: string;
-  content: string | unknown;
-}
-
-/** Truncate text to approximately maxChars, keeping whole words at boundaries */
-function truncate(text: string, maxChars: number): string {
-  if (text.length <= maxChars) return text;
-  const slice = text.substring(0, maxChars);
-  const lastSpace = slice.lastIndexOf(" ");
-  // If no space found within reasonable range, just cut at maxChars
-  if (lastSpace > maxChars * 0.7) return slice.substring(0, lastSpace) + "...";
-  return slice + "...";
-}
-
-/** Generic commit message patterns — messages matching these lack specificity */
-const GENERIC_MESSAGE_PATTERNS: RegExp[] = [
-  // English patterns
-  /^chore:\s*apply\s*changes?\s*$/i,
-  /^chore:\s*update\s*(files?)?\s*$/i,
-  /^chore:\s*commit\s*changes?\s*$/i,
-  /^chore:\s*modify\s*(files?)?\s*$/i,
-  /^chore:\s*update\s+\S+\s*$/i,
-  /^(feat|fix|chore|docs|style|refactor|test):\s*[a-zA-Z0-9\s]{0,10}$/i,
-  // Japanese patterns
-  /^(feat|fix|chore|docs|style|refactor|test):\s*(変更|修正|更新|対応|追加|削除|改善|実装|作成|適用|反映|編集)(\s*を\s*[\u3040-\u30ff\u4e00-\u9faf]{1,8})?(\s*(しました|しました。|を行いました|を実施|を反映|いたしました|します))?\s*$/i,
-  /^chore:\s*(変更を適用(?:しました)?|ファイルを更新(?:しました)?|更新しました|修正しました)\s*$/i,
-];
+import {
+  type SimpleMessage,
+  collectMessagesByRole,
+  extractTextContent,
+  headTruncate,
+} from "../utils/message-utils.js";
 
 /** Model ID patterns for cheap/small models — single source of truth */
 const CHEAP_MODEL_PATTERNS: RegExp[] = [
@@ -113,13 +97,6 @@ export function cleanCommitOutput(raw: string): string {
 
   // Layer 4: Fall back to first non-empty line
   return lines[0] || text;
-}
-
-/** Heuristic: is this commit message too generic to be useful? */
-export function isGenericMessage(message: string): boolean {
-  const m = message.trim();
-  if (m.length < 12) return true;
-  return GENERIC_MESSAGE_PATTERNS.some((p) => p.test(m));
 }
 
 /**
@@ -391,36 +368,7 @@ function getSystemPrompt(lang: string): string {
   return t(lang, "autoCommitMsg.systemPrompt");
 }
 
-function extractTextContent(content: string | unknown): string {
-  if (typeof content === "string") return content;
-  if (Array.isArray(content)) {
-    return content
-      .filter(
-        (c): c is { type: string; text?: string } =>
-          typeof c === "object" && c !== null,
-      )
-      .map((c) => c.text || "")
-      .join("\n");
-  }
-  return "";
-}
 
-/** Collect all messages of a given role, newest first */
-function collectMessagesByRole(
-  messages: SimpleMessage[],
-  role: string,
-): string[] {
-  const result: string[] = [];
-  for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].role === role) {
-      const text = extractTextContent(messages[i].content);
-      if (text.trim()) {
-        result.push(text);
-      }
-    }
-  }
-  return result;
-}
 
 function buildPrompt(
   userMessages: string[],
@@ -444,7 +392,7 @@ function buildPrompt(
   let userBudget = MAX_USER_CHARS;
   for (const msg of userMessages) {
     if (userBudget <= 0) break;
-    const truncated = truncate(msg, userBudget);
+    const truncated = headTruncate(msg, userBudget);
     userLines.push(truncated);
     userBudget -= truncated.length;
   }
@@ -457,7 +405,7 @@ function buildPrompt(
   let assistantBudget = MAX_ASSISTANT_CHARS;
   for (const msg of assistantMessages) {
     if (assistantBudget <= 0) break;
-    const truncated = truncate(msg, assistantBudget);
+    const truncated = headTruncate(msg, assistantBudget);
     assistantLines.push(truncated);
     assistantBudget -= truncated.length;
   }
@@ -465,7 +413,7 @@ function buildPrompt(
   const assistantSection = assistantStr || noData;
 
   // Build files section
-  const filesStr = truncate(changedFiles.join(", "), MAX_FILES_CHARS);
+  const filesStr = headTruncate(changedFiles.join(", "), MAX_FILES_CHARS);
   const filesSection = filesStr || noData;
 
   // Build diff section (strip noise first, then truncate)

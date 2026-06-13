@@ -13,14 +13,17 @@ import type { AgentEndEvent } from "../types.js";
 import { t } from "../utils/lang.js";
 import {
   getAutoAggCommit,
+  getAutoAggCommitMode,
   getAutoAggCommitSkipConfirmFiles,
   getAutoAggCommitSkipConfirmLines,
+  getBatchWarnTurns,
   getLanguage,
 } from "../utils/settings.js";
 import { footerManager } from "../utils/footer-manager.js";
 import { generateAutoCommitMessage } from "./auto-commit-message.js";
 import { createConfirmComponent } from "./auto-commit-confirm.js";
 import type { OverlayOptions } from "@earendil-works/pi-tui";
+import { turnLog } from "./turn-log.js";
 import {
   hasChanges,
   isGitRepository,
@@ -91,6 +94,37 @@ export async function handleAutoCommit(
   if (changedFiles.length === 0) {
     return;
   }
+
+  // ── Always append to TurnLog (both per_turn and accumulate modes) ──
+  turnLog.append(event, changedFiles);
+
+  // ── Check commit mode ──
+  const mode = getAutoAggCommitMode(ctx.cwd);
+  if (mode === "accumulate") {
+    // accumulate モード: TurnLog 蓄積のみ、コミットしない
+    await footerManager.setBatchStatus(
+      turnLog.turnCount,
+      turnLog.totalFilesChanged,
+    );
+
+    const warnTurns = getBatchWarnTurns(ctx.cwd);
+    if (
+      warnTurns > 0 &&
+      turnLog.turnCount >= warnTurns &&
+      !turnLog.warnNotified
+    ) {
+      turnLog.warnNotified = true;
+      ctx.ui.notify(
+        t(lang, "batchCommit.warnThreshold", {
+          count: String(turnLog.turnCount),
+        }),
+        "warning",
+      );
+    }
+    return;
+  }
+
+  // per_turn モード: 既存の即時コミットフロー
 
   // Capture git diff for AI context (staged + unstaged changes vs HEAD)
   const { stdout: diffOutput, code: diffCode } = await pi.exec(

@@ -6,22 +6,27 @@
  *
  * With --review flag: opens an interactive overlay where the user can
  * inspect, edit, and exclude hunks before committing.
+ *
+ * In accumulate mode (auto_agg_commit_mode = "accumulate"):
+ * delegates to batch-committer which injects TurnLog context into the AI prompt.
  */
 
 import type {
   ExtensionAPI,
-  ExtensionContext,
+  ExtensionCommandContext,
 } from "@earendil-works/pi-coding-agent";
 import { analyzeDiff, processHunks } from "../core/diff-analyzer.js";
 import {
   collectDiff,
   ensureReadyToCommit,
   resetStaging,
-  stageFiles,
 } from "../core/git.js";
-import { createReviewComponent } from "../core/review.js";
+import { runHunkReview } from "../core/review.js";
 import { sanitizeCommitMessage } from "../core/commit-message.js";
-import type { Hunk, ReviewResult } from "../types.js";
+import { commitHunks } from "../core/commit-hunks.js";
+import { batchCommitWithCleanup } from "../core/batch-committer.js";
+import { getAutoAggCommitMode } from "../utils/settings.js";
+import { turnLog } from "../core/turn-log.js";
 import { t } from "../utils/lang.js";
 import { getLanguage } from "../utils/settings.js";
 import { footerManager } from "../utils/footer-manager.js";
@@ -35,150 +40,9 @@ function parseReviewFlag(args: string): boolean {
   return /(?:^|\s)--review(?:\s|$)/.test(args);
 }
 
-/** Extract all file paths from a git diff string */
-function extractDiffFiles(diff: string): string[] {
-  const files: string[] = [];
-  const regex = /^diff --git a\/(.+) b\/(.+)$/gm;
-  let match = regex.exec(diff);
-  while (match !== null) {
-    files.push(match[2]);
-    match = regex.exec(diff);
-  }
-  return files;
-}
-
-/** Find files in the diff that are not covered by any hunk */
-function findUnstagedFiles(diff: string, hunks: Hunk[]): string[] {
-  const diffFiles = new Set(extractDiffFiles(diff));
-  for (const hunk of hunks) {
-    for (const f of hunk.files) {
-      diffFiles.delete(f);
-    }
-  }
-  return [...diffFiles];
-}
-
-/**
- * Run the interactive hunk review overlay.
- * Returns the ReviewResult, or null if cancelled or no UI.
- */
-async function runReview(
-  ctx: ExtensionContext,
-  hunks: Hunk[],
-  diff: string,
-  runLang: string,
-): Promise<ReviewResult | null> {
-  if (!ctx.hasUI) return null;
-
-  await footerManager.setPhase("review", runLang);
-
-  const unstagedFiles = findUnstagedFiles(diff, hunks);
-
-  const result = await ctx.ui.custom<ReviewResult>(
-    createReviewComponent(hunks, runLang, unstagedFiles),
-    {
-      overlay: true,
-      overlayOptions: {
-        maxHeight: "70%",
-        width: "80%",
-        anchor: "center",
-      },
-    },
-  );
-
-  if (result.cancelled) {
-    ctx.ui.notify(t(runLang, "review.cancelled"), "info");
-    return null;
-  }
-
-  return result;
-}
-
-/** Commit hunks sequentially with progress updates. */
-async function commitHunks(
-  pi: ExtensionAPI,
-  ctx: ExtensionContext,
-  hunks: Hunk[],
-  runLang: string,
-): Promise<{
-  committed: number;
-  failed: number;
-  skipped: number;
-  aborted: number;
-}> {
-  let committedCount = 0;
-  let failedCount = 0;
-  let skippedCount = 0;
-  const total = hunks.length;
-
-  for (let i = 0; i < hunks.length; i++) {
-    const hunk = hunks[i];
-    await footerManager.setCommitProgress(i + 1, hunks.length);
-
-    // Ensure clean staging area before each hunk
-    try {
-      await resetStaging(pi, ctx.cwd);
-    } catch {
-      ctx.ui.notify(t(runLang, "aggCommit.stagingResetFailed"), "error");
-      failedCount++;
-      const remaining = total - (i + 1);
-      return {
-        committed: committedCount,
-        failed: failedCount,
-        skipped: skippedCount,
-        aborted: remaining,
-      };
-    }
-
-    try {
-      await stageFiles(pi, hunk.files, ctx.cwd);
-    } catch {
-      failedCount++;
-      continue;
-    }
-
-    const { stdout: stagedDiff, code: diffCode } = await pi.exec(
-      "git",
-      ["diff", "--cached", "--stat"],
-      { cwd: ctx.cwd },
-    );
-    if (diffCode !== 0 || !stagedDiff.trim()) {
-      skippedCount++;
-      continue;
-    }
-
-    const { code: exitCode, stderr } = await pi.exec(
-      "git",
-      ["commit", "-m", hunk.message],
-      { cwd: ctx.cwd },
-    );
-    if (exitCode !== 0) {
-      const detail = stderr.trim() ? ` — ${stderr.trim()}` : "";
-      ctx.ui.notify(
-        t(runLang, "aggCommit.commitFailed", {
-          message: hunk.message,
-          exitCode: String(exitCode),
-        }) + detail,
-        "warning",
-      );
-      failedCount++;
-      continue;
-    }
-
-    committedCount++;
-  }
-
-  return {
-    committed: committedCount,
-    failed: failedCount,
-    skipped: skippedCount,
-    aborted: 0,
-  };
-}
-
 export async function handleAggCommit(
   pi: ExtensionAPI,
-  ctx: ExtensionContext,
+  ctx: ExtensionCommandContext,
   args: string,
 ): Promise<void> {
   const lang = getLanguage(ctx.cwd);
@@ -209,6 +73,79 @@ export async function handleAggCommit(
     ctx.ui.notify(t(runLang, "aggCommit.alreadyRunning"), "warning");
     return;
   }
+
+  // ── accumulate モード: batch-committer に全委譲 ──
+  const mode = getAutoAggCommitMode(ctx.cwd);
+  if (mode === "accumulate" && turnLog.turnCount > 0) {
+    try {
+      await footerManager.setRunning("agg-commit", "prepare", runLang);
+
+      const preCheck = await ensureReadyToCommit(pi, ctx.cwd);
+      if (preCheck) {
+        const key =
+          preCheck === "not_git_repo"
+            ? "aggCommit.notGitRepo"
+            : preCheck === "merge_conflict"
+              ? "aggCommit.mergeConflict"
+              : "aggCommit.noChanges";
+        const level =
+          preCheck === "merge_conflict"
+            ? "error"
+            : preCheck === "not_git_repo"
+              ? "warning"
+              : "info";
+        ctx.ui.notify(t(runLang, key), level);
+        return;
+      }
+
+      const { committed, failed, skipped, aborted } =
+        await batchCommitWithCleanup(pi, ctx, runLang, isReview);
+
+      // Summary notification
+      const parts: string[] = [];
+      if (committed > 0) {
+        parts.push(
+          t(runLang, "aggCommit.summaryCommitted", {
+            count: String(committed),
+          }),
+        );
+      }
+      if (skipped > 0) {
+        parts.push(
+          t(runLang, "aggCommit.summarySkipped", {
+            count: String(skipped),
+          }),
+        );
+      }
+      if (failed > 0) {
+        parts.push(
+          t(runLang, "aggCommit.summaryFailed", {
+            count: String(failed),
+          }),
+        );
+      }
+      if (aborted > 0) {
+        parts.push(
+          t(runLang, "aggCommit.summaryAborted", {
+            remaining: String(aborted),
+          }),
+        );
+      }
+
+      if (parts.length === 0) {
+        ctx.ui.notify(t(runLang, "aggCommit.summaryAllFailed"), "error");
+      } else if (failed > 0) {
+        ctx.ui.notify(parts.join(", "), "warning");
+      } else {
+        ctx.ui.notify(parts.join(", "), "info");
+      }
+      return;
+    } finally {
+      await footerManager.clearRunning();
+    }
+  }
+
+  // ── per_turn モード: 既存フロー ──
 
   try {
     await footerManager.setRunning("agg-commit", "prepare", runLang);
@@ -243,9 +180,16 @@ export async function handleAggCommit(
       return;
     }
 
-    // Analyze diff into logical hunks
+    // Analyze diff into logical hunks (with TurnLog if available)
     await footerManager.setPhase("analyze", runLang);
-    let hunks = await analyzeDiff(pi, ctx, diff, runLang);
+    const turnLogText = turnLog.formatForPrompt();
+    let hunks = await analyzeDiff(
+      pi,
+      ctx,
+      diff,
+      runLang,
+      turnLogText || undefined,
+    );
     if (hunks.length === 0) {
       ctx.ui.notify(t(runLang, "aggCommit.noHunksFound"), "info");
       return;
@@ -257,7 +201,7 @@ export async function handleAggCommit(
 
     // ── Review mode: interactive hunk review ──────────────────
     if (isReview) {
-      const reviewResult = await runReview(ctx, hunks, diff, runLang);
+      const reviewResult = await runHunkReview(ctx, hunks, diff, runLang);
       if (reviewResult === null) {
         return; // cancelled — no commits
       }

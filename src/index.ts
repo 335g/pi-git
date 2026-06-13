@@ -12,12 +12,14 @@ import { handleConfig } from "./commands/config.js";
 import { handleDiagnostics } from "./commands/diagnostics.js";
 import { handleAutoCommit } from "./core/auto-commit.js";
 import { recoverOrphanedStashes } from "./core/orphan-recovery.js";
+import { turnLog } from "./core/turn-log.js";
 import { footerManager } from "./utils/footer-manager.js";
 
 export default function (pi: ExtensionAPI) {
   pi.on("session_start", async (_event, ctx) => {
     try {
       if (ctx.hasUI) {
+        turnLog.clear(); // reset from previous session
         footerManager.initialize(pi, ctx.ui, ctx.cwd);
         await recoverOrphanedStashes(pi, ctx);
         await footerManager.refresh();

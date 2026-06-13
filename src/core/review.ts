@@ -7,8 +7,12 @@
 
 import type { Component } from "@earendil-works/pi-tui";
 import { Input } from "@earendil-works/pi-tui";
+import type {
+  ExtensionCommandContext,
+} from "@earendil-works/pi-coding-agent";
 import type { Hunk, ReviewedHunk, ReviewResult } from "../types.js";
 import { t } from "../utils/lang.js";
+import { footerManager } from "../utils/footer-manager.js";
 
 /** Maximum characters for a commit message line before truncation */
 const MAX_MESSAGE_DISPLAY = 50;
@@ -20,6 +24,67 @@ export type ReviewComponentFactory = (
   _keybindings: unknown,
   done: (result: ReviewResult) => void,
 ) => Component & { dispose?(): void };
+
+/** Extract all file paths from a git diff string */
+function extractDiffFiles(diff: string): string[] {
+  const files: string[] = [];
+  const regex = /^diff --git a\/(.+) b\/(.+)$/gm;
+  let match = regex.exec(diff);
+  while (match !== null) {
+    files.push(match[2]!);
+    match = regex.exec(diff);
+  }
+  return files;
+}
+
+/** Find files in the diff that are not covered by any hunk */
+function findUnstagedFiles(diff: string, hunks: Hunk[]): string[] {
+  const diffFiles = new Set(extractDiffFiles(diff));
+  for (const hunk of hunks) {
+    for (const f of hunk.files) {
+      diffFiles.delete(f);
+    }
+  }
+  return [...diffFiles];
+}
+
+/**
+ * Run the interactive hunk review overlay.
+ * Extracted from agg-commit.ts for reuse by batch-committer.ts.
+ *
+ * @returns ReviewResult, or null if cancelled or no UI.
+ */
+export async function runHunkReview(
+  ctx: ExtensionCommandContext,
+  hunks: Hunk[],
+  diff: string,
+  runLang: string,
+): Promise<ReviewResult | null> {
+  if (!ctx.hasUI) return null;
+
+  await footerManager.setPhase("review", runLang);
+
+  const unstagedFiles = findUnstagedFiles(diff, hunks);
+
+  const result = await ctx.ui.custom<ReviewResult>(
+    createReviewComponent(hunks, runLang, unstagedFiles),
+    {
+      overlay: true,
+      overlayOptions: {
+        maxHeight: "70%",
+        width: "80%",
+        anchor: "center",
+      },
+    },
+  );
+
+  if (result.cancelled) {
+    ctx.ui.notify(t(runLang, "review.cancelled"), "info");
+    return null;
+  }
+
+  return result;
+}
 
 /**
  * Create a review component factory for use with ctx.ui.custom().

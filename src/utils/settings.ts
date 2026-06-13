@@ -34,6 +34,10 @@ export interface PiGitSettings {
   auto_agg_commit_skip_confirm_files?: number;
   /** Maximum changed lines to skip confirmation (0 = never skip) */
   auto_agg_commit_skip_confirm_lines?: number;
+  /** Commit mode: "per_turn" (immediate) or "accumulate" (batch via /git-agg-commit) */
+  auto_agg_commit_mode?: "per_turn" | "accumulate";
+  /** Number of accumulated turns before showing a commit reminder (0 = disabled) */
+  batch_warn_turns?: number;
 }
 
 export type SettingOrigin = "default" | "global" | "local";
@@ -92,6 +96,18 @@ export const VALID_KEYS_META: KeyMeta[] = [
     type: "number",
     messageKey: "config.keyDesc.auto_agg_commit_skip_confirm_lines",
     valid_values: "non-negative integer (0 = never skip confirmation)",
+  },
+  {
+    key: "auto_agg_commit_mode",
+    type: "string",
+    messageKey: "config.keyDesc.auto_agg_commit_mode",
+    valid_values: '"per_turn" or "accumulate"',
+  },
+  {
+    key: "batch_warn_turns",
+    type: "number",
+    messageKey: "config.keyDesc.batch_warn_turns",
+    valid_values: "non-negative integer (0 = disabled, default: 5)",
   },
 ];
 
@@ -282,6 +298,16 @@ export function getAutoAggCommitSkipConfirmFiles(cwd?: string): number {
 
 export function getAutoAggCommitSkipConfirmLines(cwd?: string): number {
   return getSettings(cwd).auto_agg_commit_skip_confirm_lines ?? 0;
+}
+
+export function getAutoAggCommitMode(
+  cwd?: string,
+): "per_turn" | "accumulate" {
+  return getSettings(cwd).auto_agg_commit_mode ?? "per_turn";
+}
+
+export function getBatchWarnTurns(cwd?: string): number {
+  return getSettings(cwd).batch_warn_turns ?? 5;
 }
 
 // ───────────────────────────────────────────────

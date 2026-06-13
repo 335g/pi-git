@@ -15,7 +15,12 @@ import { diagIncr } from "../utils/diagnostics.js";
 import { footerManager } from "../utils/footer-manager.js";
 import { t } from "../utils/lang.js";
 import { getLanguage } from "../utils/settings.js";
-import { sanitizeHunk, inferTypeFromFiles } from "./commit-message.js";
+import {
+  sanitizeHunk,
+  inferTypeFromFiles,
+  isGenericMessage,
+  generateFallbackMessage,
+} from "./commit-message.js";
 
 /** Maximum diff bytes to send to the AI (truncated if larger) */
 const MAX_DIFF_BYTES = 30_000;
@@ -30,6 +35,10 @@ function getSystemPrompt(lang: string): string {
   return t(lang, "diffAnalyzer.systemPrompt");
 }
 
+function getSystemPromptWithContext(lang: string): string {
+  return t(lang, "diffAnalyzer.systemPromptWithContext");
+}
+
 function buildPrompt(diff: string, lang: string): string {
   const examples = t(lang, "diffAnalyzer.examples");
   const hintText = buildTypeHint(diff);
@@ -37,6 +46,18 @@ function buildPrompt(diff: string, lang: string): string {
     ? `${t(lang, "diffAnalyzer.typeHints")}\n${hintText}\n\n`
     : "";
   return t(lang, "diffAnalyzer.buildPrompt", { diff, examples, typeHints });
+}
+
+/** Build a prompt that includes TurnLog conversation context */
+function buildPromptWithContext(
+  diff: string,
+  turnLogText: string,
+  lang: string,
+): string {
+  return t(lang, "diffAnalyzer.buildPromptWithContext", {
+    diff,
+    turnLogText,
+  });
 }
 
 /**
@@ -288,9 +309,18 @@ export async function analyzeDiff(
   ctx: ExtensionContext,
   diff: string,
   langOverride?: string,
+  turnLogText?: string,
 ): Promise<Hunk[]> {
   const fileCount = countFilesInDiff(diff);
   const lang = langOverride ?? getLanguage(ctx.cwd);
+
+  // Choose prompt builder: with context if TurnLog is provided
+  const buildPromptFn = turnLogText
+    ? (d: string) => buildPromptWithContext(d, turnLogText, lang)
+    : (d: string) => buildPrompt(d, lang);
+  const systemPromptFn = turnLogText
+    ? () => getSystemPromptWithContext(lang)
+    : () => getSystemPrompt(lang);
 
   // Split into batches if many files (for progress visibility + smaller payloads)
   if (fileCount > FILES_PER_BATCH) {
@@ -305,8 +335,8 @@ export async function analyzeDiff(
 
       try {
         const result = await aiComplete(ctx, {
-          systemPrompt: getSystemPrompt(lang),
-          userMessage: buildPrompt(batchTruncated, lang),
+          systemPrompt: systemPromptFn(),
+          userMessage: buildPromptFn(batchTruncated),
           maxTokens: MAX_OUTPUT_TOKENS,
           temperature: 0,
         });
@@ -338,8 +368,8 @@ export async function analyzeDiff(
 
   try {
     const result = await aiComplete(ctx, {
-      systemPrompt: getSystemPrompt(lang),
-      userMessage: buildPrompt(truncated, lang),
+      systemPrompt: systemPromptFn(),
+      userMessage: buildPromptFn(truncated),
       maxTokens: MAX_OUTPUT_TOKENS,
       temperature: 0,
     });
@@ -364,6 +394,13 @@ export function processHunks(hunks: Hunk[]): Hunk[] {
   const sanitized = hunks.map(sanitizeHunk);
   const seenFiles = new Set<string>();
   return sanitized
+    .map((hunk) => {
+      // Check for generic messages and replace with file-based fallback
+      if (isGenericMessage(hunk.message)) {
+        return { ...hunk, message: generateFallbackMessage(hunk.files) };
+      }
+      return hunk;
+    })
     .map((hunk) => ({
       ...hunk,
       files: hunk.files.filter((f) => {

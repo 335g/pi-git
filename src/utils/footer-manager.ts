@@ -13,7 +13,12 @@ import type {
   ExtensionUIContext,
 } from "@earendil-works/pi-coding-agent";
 import { t } from "./lang.js";
-import { getAutoAggCommit, getLanguage } from "./settings.js";
+import {
+  getAutoAggCommit,
+  getAutoAggCommitMode,
+  getBatchWarnTurns,
+  getLanguage,
+} from "./settings.js";
 
 const STATUS_KEY = "pi-git-agg-commit";
 
@@ -34,6 +39,7 @@ class FooterManager {
   private pi: ExtensionAPI | null = null;
   private ui: ExtensionUIContext | null = null;
   private cwd: string | undefined;
+  private accumulateActive = false;
   private running: {
     command: string;
     phase: Phase;
@@ -78,6 +84,7 @@ class FooterManager {
   async refresh(): Promise<void> {
     if (!this.pi || !this.ui) return;
     if (this.running) return;
+    if (this.accumulateActive) return; // don't overwrite accumulate display
 
     const enabled = getAutoAggCommit(this.cwd);
     const lang = getLanguage(this.cwd);
@@ -102,6 +109,36 @@ class FooterManager {
     } else {
       this.ui.setStatus(STATUS_KEY, t(lang, "footer.autoCommit.onClean"));
     }
+  }
+
+  /**
+   * Set the batch accumulation status for accumulate mode.
+   * Shows turn count and file count with severity-based formatting.
+   */
+  setBatchStatus(turns: number, files: number): void {
+    if (!this.ui) return;
+
+    const mode = getAutoAggCommitMode(this.cwd);
+    if (mode !== "accumulate") return;
+
+    this.accumulateActive = true;
+    const lang = getLanguage(this.cwd);
+    const warnTurns = getBatchWarnTurns(this.cwd);
+
+    const key =
+      warnTurns > 0 && turns >= warnTurns * 2
+        ? "footer.autoCommit.accumulateCritical"
+        : warnTurns > 0 && turns >= warnTurns
+          ? "footer.autoCommit.accumulateWarn"
+          : "footer.autoCommit.accumulate";
+
+    this.ui.setStatus(
+      STATUS_KEY,
+      t(lang, key, {
+        turns: String(turns),
+        files: String(files),
+      }),
+    );
   }
 
   /**

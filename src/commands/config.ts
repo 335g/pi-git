@@ -33,7 +33,9 @@ type ValidKey =
   | "auto_agg_commit_min_files"
   | "auto_agg_commit_min_lines"
   | "auto_agg_commit_skip_confirm_files"
-  | "auto_agg_commit_skip_confirm_lines";
+  | "auto_agg_commit_skip_confirm_lines"
+  | "auto_agg_commit_mode"
+  | "batch_warn_turns";
 
 function isValidKey(key: string): key is ValidKey {
   return VALID_KEYS_META.some((meta) => meta.key === key);
@@ -64,6 +66,22 @@ function validateValue(key: ValidKey, value: string): string | boolean | number 
       if (!Number.isInteger(num) || num < 0) {
         throw new Error(
           `Invalid ${key}: ${value}. Must be a non-negative integer.`,
+        );
+      }
+      return num;
+    }
+    case "auto_agg_commit_mode":
+      if (value !== "per_turn" && value !== "accumulate") {
+        throw new Error(
+          `Invalid auto_agg_commit_mode: ${value}. Must be "per_turn" or "accumulate".`,
+        );
+      }
+      return value;
+    case "batch_warn_turns": {
+      const num = Number(value);
+      if (!Number.isInteger(num) || num < 0) {
+        throw new Error(
+          `Invalid batch_warn_turns: ${value}. Must be a non-negative integer.`,
         );
       }
       return num;

@@ -102,6 +102,10 @@ export const messages = {
       "Maximum changed files to skip confirmation (0 = never skip, always confirm)",
     "config.keyDesc.auto_agg_commit_skip_confirm_lines":
       "Maximum changed lines to skip confirmation (0 = never skip, always confirm)",
+    "config.keyDesc.auto_agg_commit_mode":
+      "Commit mode: per_turn (commit after each turn) or accumulate (batch commit via /git-agg-commit)",
+    "config.keyDesc.batch_warn_turns":
+      "Number of accumulated turns before showing a commit reminder (0 = disabled)",
 
     // ── auto-commit.ts ─────────────────────────────────────────
     "autoCommit.commitFailed": "Commit failed: {error}",
@@ -136,6 +140,28 @@ export const messages = {
     // ── diff-analyzer.ts: user prompt ──────────────────────────
     "diffAnalyzer.buildPrompt":
       "{examples}\n\n{typeHints}Here is the git diff to analyze. Split it into logical hunks:\n\n```diff\n{diff}\n```\n\nWrite commit message subjects in English.\nRespond with ONLY a JSON array of hunks as specified.",
+
+    // ── diff-analyzer.ts: extended system prompt (with TurnLog) ─
+    "diffAnalyzer.systemPromptWithContext":
+      'Split git diff into logical hunks. Use the conversation log to understand the INTENT behind each change, but the DIFF is always the primary truth source.\n\nPriority order:\n1. Diff structure (what actually changed in files)\n2. File co-location patterns (which files change together)\n3. TurnLog Files field (per-turn file correlation)\n4. TurnLog conversation text (intent hints)\n\nRules:\n- Each hunk = single logical change\n- A single change may span multiple conversation turns — do NOT enforce 1-turn = 1-hunk\n- If the conversation log is unclear or conflicts with the diff, the diff always wins\n- If a file appears in the diff but not in any TurnLog entry, do not force-fit it to a turn\n- When a file was modified across multiple turns, prefer the most recent turn\n- Write commit message subjects in English\n\nDo NOT generate vague, non-specific messages such as:\n- "chore: apply changes", "chore: update files", "chore: modify files"\n- Any message whose subject appears nowhere in the GIT DIFF\n- Generic verbs without specific file/feature references\n\nReturn ONLY a JSON array. No explanations or code fences.',
+
+    // ── diff-analyzer.ts: extended user prompt (with TurnLog) ─
+    "diffAnalyzer.buildPromptWithContext":
+      '=== GIT DIFF (PRIMARY — this is what actually changed) ===\n```diff\n{diff}\n```\n\n=== CONVERSATION LOG (supplementary — use only to infer intent) ===\n{turnLogText}\n\nSplit the diff above into logical hunks. Use the conversation log ONLY to understand WHY changes were made, not to override the diff structure.\nWrite commit message subjects in English.\nRespond with ONLY a JSON array of hunks.',
+
+    // ── footer-manager.ts: accumulate mode ─────────────────────
+    "footer.autoCommit.accumulate":
+      "auto-commit: accumulate ({turns} turns) | {files} files",
+    "footer.autoCommit.accumulateWarn":
+      "⚠ auto-commit: accumulate ({turns} turns) | {files} files",
+    "footer.autoCommit.accumulateCritical":
+      "!! auto-commit: accumulate ({turns} turns) | {files} files — run /git-agg-commit",
+
+    // ── batch-committer.ts ─────────────────────────────────────
+    "batchCommit.warnThreshold":
+      "{count} turns of uncommitted changes accumulated. Run /git-agg-commit to commit.",
+    "batchCommit.modeSwitchNotice":
+      "Switched to accumulate mode. Changes will accumulate across turns. Use /git-agg-commit to commit.",
 
     // ── auto-commit-message.ts: system prompt ──────────────────
     "autoCommitMsg.systemPrompt":
@@ -261,6 +287,10 @@ export const messages = {
       "確認をスキップする最大変更ファイル数（0 = 常に確認。どちらかの条件を満たせば確認をスキップ）",
     "config.keyDesc.auto_agg_commit_skip_confirm_lines":
       "確認をスキップする最大変更行数（0 = 常に確認。どちらかの条件を満たせば確認をスキップ）",
+    "config.keyDesc.auto_agg_commit_mode":
+      "コミットモード: per_turn（毎ターンコミット）または accumulate（/git-agg-commitで一括コミット）",
+    "config.keyDesc.batch_warn_turns":
+      "コミットリマインダーを表示する蓄積ターン数（0 = 無効）",
 
     // ── auto-commit.ts ─────────────────────────────────────────
     "autoCommit.commitFailed": "コミットに失敗しました: {error}",
@@ -296,6 +326,28 @@ export const messages = {
     // ── diff-analyzer.ts: user prompt ──────────────────────────
     "diffAnalyzer.buildPrompt":
       "{examples}\n\n{typeHints}以下のgit diffを分析し、論理的なhunkに分割してください:\n\n```diff\n{diff}\n```\n\nコミットメッセージのサブジェクトは必ず日本語で記述してください。\n指定された形式のJSON配列のみを返してください。",
+
+    // ── diff-analyzer.ts: extended system prompt (with TurnLog) ─
+    "diffAnalyzer.systemPromptWithContext":
+      'git diffを論理的なhunkに分割してください。会話ログを変更の意図を理解するために使用しますが、DIFFが常に最優先の情報源です。\n\n優先順位:\n1. Diff構造（ファイルの実際の変更内容）\n2. ファイルの共起パターン（どのファイルが一緒に変更されるか）\n3. TurnLogのFilesフィールド（ターンごとのファイル相関）\n4. TurnLogの会話テキスト（意図のヒント）\n\nルール:\n- 各hunk = 単一の論理的な変更\n- 1つの変更が複数の会話ターンに跨ることがある — 1ターン=1hunkを強制しない\n- 会話ログが不明瞭またはdiffと矛盾する場合は、常にdiffを優先する\n- diffに含まれるファイルがTurnLogにない場合は、無理にターンに紐付けない\n- 同じファイルが複数ターンで変更された場合は、最も最近のターンを優先する\n- コミットメッセージのサブジェクトは必ず日本語で記述する\n\n禁止事項（以下のような汎用的で具体性のないメッセージは絶対に生成しない）:\n- 「変更を適用」「ファイルを更新」「修正しました」\n- GIT DIFFに現れていない単語だけを使ったメッセージ\n\nJSON配列のみを返してください。説明やコードフェンスは不要。',
+
+    // ── diff-analyzer.ts: extended user prompt (with TurnLog) ─
+    "diffAnalyzer.buildPromptWithContext":
+      '=== GIT DIFF（最優先 — 実際に変更された内容） ===\n```diff\n{diff}\n```\n\n=== 会話ログ（補助 — 変更の意図を理解するためだけに使用） ===\n{turnLogText}\n\n上記のdiffを論理的なhunkに分割してください。会話ログは変更の理由を理解するためだけに使用し、diffの構造を上書きしないでください。\nコミットメッセージのサブジェクトは必ず日本語で記述してください。\nJSON配列のみを返してください。',
+
+    // ── footer-manager.ts: accumulate mode ─────────────────────
+    "footer.autoCommit.accumulate":
+      "auto-commit: accumulate ({turns}ターン) | {files}ファイル",
+    "footer.autoCommit.accumulateWarn":
+      "⚠ auto-commit: accumulate ({turns}ターン) | {files}ファイル",
+    "footer.autoCommit.accumulateCritical":
+      "!! auto-commit: accumulate ({turns}ターン) | {files}ファイル — /git-agg-commit を実行してください",
+
+    // ── batch-committer.ts ─────────────────────────────────────
+    "batchCommit.warnThreshold":
+      "{count}ターンの未コミット変更が蓄積されています。/git-agg-commit でコミットしてください。",
+    "batchCommit.modeSwitchNotice":
+      "accumulateモードに切り替えました。変更はターンごとに蓄積されます。コミットするには /git-agg-commit を実行してください。",
 
     // ── auto-commit-message.ts: system prompt ──────────────────
     "autoCommitMsg.systemPrompt":
