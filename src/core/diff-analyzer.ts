@@ -15,6 +15,9 @@ import { diagIncr } from "../utils/diagnostics.js";
 import { footerManager } from "../utils/footer-manager.js";
 import { t } from "../utils/lang.js";
 import { getLanguage } from "../utils/settings.js";
+import { writeFileSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import {
   sanitizeHunk,
   inferTypeFromFiles,
@@ -406,73 +409,245 @@ function buildIntentPrompt(
 }
 
 /**
- * Parse AI response into HunkGroupingResult.
- * Handles JSON objects with nested groups arrays.
- * Falls back gracefully on parse failures.
+ * Parse AI response in tagged-line format into HunkGroupingResult.
+ *
+ * Expected format:
+ *   OVERALL: high|medium|low
+ *
+ *   COMMIT: type(scope): subject
+ *   HUNKS: 1,3
+ *   CONF: high|medium|low
+ *   TURNS: 1,2
+ *
+ *   COMMIT: type: subject
+ *   HUNKS: 2
+ *   CONF: low
+ *   NOTE: reason
+ *
+ * Also handles JSON as a fallback (AI might ignore format instructions).
  */
 export function parseHunkGroupingResult(text: string): HunkGroupingResult | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+
+  // Try tagged-line format first
+  const tagged = tryParseTaggedFormat(trimmed);
+  if (tagged) return tagged;
+
+  // Fallback: try JSON parsing (AI might have ignored format instructions)
+  const json = tryParseJSONFormat(trimmed);
+  if (json) return json;
+
+  // Last resort: try to extract any OVERALL line and COMMIT blocks using heuristics
+  return tryParseHeuristic(trimmed);
+}
+
+/** Parse tagged-line format */
+function tryParseTaggedFormat(text: string): HunkGroupingResult | null {
+  // Split into blocks separated by blank lines
+  const blocks = text.split(/\n\s*\n/).filter((b) => b.trim());
+  if (blocks.length === 0) return null;
+
+  let overallConfidence: "high" | "medium" | "low" = "medium";
+  const groups: CommitGroup[] = [];
+
+  for (const block of blocks) {
+    const lines = block.split("\n").map((l) => l.trim()).filter(Boolean);
+    if (lines.length === 0) continue;
+
+    // Parse OVERALL line
+    const overallMatch = lines[0].match(/^OVERALL\s*:\s*(high|medium|low)\s*$/i);
+    if (overallMatch) {
+      overallConfidence = overallMatch[1].toLowerCase() as "high" | "medium" | "low";
+      continue;
+    }
+
+    // Parse COMMIT block
+    const commitLine = lines.find((l) => l.startsWith("COMMIT") || l.startsWith("COMMIT:") || l.startsWith("commit") || l.startsWith("commit:"));
+    if (!commitLine) continue;
+
+    const message = commitLine.replace(/^COMMIT\s*:\s*/i, "").trim();
+    if (!message) continue;
+
+    // Parse HUNKS
+    const hunksLine = lines.find((l) => l.startsWith("HUNKS") || l.startsWith("hunks"));
+    const hunks: DiffHunkRef[] = [];
+    if (hunksLine) {
+      const nums = hunksLine.replace(/^HUNKS\s*:\s*/i, "").trim();
+      for (const n of nums.split(/[,\s]+/)) {
+        const idx = parseInt(n, 10);
+        if (idx > 0) hunks.push({ globalIndex: idx, file: "" });
+      }
+    }
+    if (hunks.length === 0) continue;
+
+    // Parse CONF
+    const confLine = lines.find((l) => l.startsWith("CONF") || l.startsWith("conf"));
+    let confidence: "high" | "medium" | "low" = "medium";
+    if (confLine) {
+      const c = confLine.replace(/^CONF\s*:\s*/i, "").trim().toLowerCase();
+      if (c === "high" || c === "medium" || c === "low") confidence = c;
+    }
+
+    // Parse TURNS (optional)
+    const turnsLine = lines.find((l) => l.startsWith("TURNS") || l.startsWith("turns"));
+    let turnIndices: number[] | undefined;
+    if (turnsLine) {
+      const nums = turnsLine.replace(/^TURNS\s*:\s*/i, "").trim();
+      turnIndices = nums.split(/[,\s]+/).map(Number).filter((n) => n > 0);
+      if (turnIndices.length === 0) turnIndices = undefined;
+    }
+
+    // Parse NOTE (optional)
+    const noteLine = lines.find((l) => l.startsWith("NOTE") || l.startsWith("note"));
+    const note = noteLine ? noteLine.replace(/^NOTE\s*:\s*/i, "").trim() : undefined;
+
+    groups.push({ hunks, message, confidence, turnIndices, note });
+  }
+
+  if (groups.length === 0) return null;
+  return { overallConfidence, groups };
+}
+
+/** Fallback: try to parse JSON format */
+function tryParseJSONFormat(text: string): HunkGroupingResult | null {
   let jsonText = text.trim();
 
-  // Layer 1: Extract JSON from code fences
-  const codeFenceMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (codeFenceMatch) {
-    jsonText = codeFenceMatch[1].trim();
+  // Strip code fences
+  const fenceMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fenceMatch) jsonText = fenceMatch[1].trim();
+
+  // Find JSON start
+  const firstBrace = jsonText.indexOf("{");
+  const firstBracket = jsonText.indexOf("[");
+  const startIdx = firstBrace >= 0 && firstBracket >= 0
+    ? Math.min(firstBrace, firstBracket)
+    : Math.max(firstBrace, firstBracket);
+  if (startIdx > 0) jsonText = jsonText.substring(startIdx);
+
+  // Trim trailing non-JSON
+  const lastBrace = jsonText.lastIndexOf("}");
+  const lastBracket = jsonText.lastIndexOf("]");
+  if (lastBrace > 0 || lastBracket > 0) {
+    jsonText = jsonText.substring(0, Math.max(lastBrace, lastBracket) + 1);
   }
 
   try {
     const parsed = JSON.parse(jsonText);
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-      return null;
-    }
 
-    const overallConfidence = parsed.overallConfidence;
-    if (
-      overallConfidence !== "high" &&
-      overallConfidence !== "medium" &&
-      overallConfidence !== "low"
-    ) {
-      return null;
-    }
-
-    if (!Array.isArray(parsed.groups)) return null;
-
-    const groups: CommitGroup[] = [];
-    for (const g of parsed.groups) {
-      if (typeof g !== "object" || g === null) continue;
-      if (!Array.isArray(g.hunks) || typeof g.message !== "string") continue;
-
-      const hunks: DiffHunkRef[] = [];
-      for (const idx of g.hunks as number[]) {
-        if (typeof idx === "number" && Number.isInteger(idx) && idx > 0) {
-          hunks.push({ globalIndex: idx, file: "" });
+    if (Array.isArray(parsed)) {
+      // Array format: [{hunks, message, ...}]
+      const groups: CommitGroup[] = [];
+      for (const item of parsed) {
+        if (typeof item === "object" && item !== null && Array.isArray(item.hunks)) {
+          groups.push({
+            hunks: (item.hunks as number[]).map((i) => ({ globalIndex: i, file: "" })),
+            message: item.message || "chore: update files",
+            confidence: "medium",
+            turnIndices: Array.isArray(item.turnIndices) ? item.turnIndices : undefined,
+            note: item.note,
+          });
         }
       }
-      if (hunks.length === 0) continue;
-
-      const confidence =
-        g.confidence === "high" || g.confidence === "medium" || g.confidence === "low"
-          ? g.confidence
-          : "medium";
-
-      groups.push({
-        hunks,
-        message: (g.message as string) || "chore: update files",
-        confidence,
-        turnIndices: Array.isArray(g.turnIndices)
-          ? (g.turnIndices as number[]).filter(
-              (t: unknown) => typeof t === "number",
-            )
-          : undefined,
-        note: typeof g.note === "string" ? g.note : undefined,
-      });
+      if (groups.length > 0) return { overallConfidence: "medium", groups };
     }
 
-    if (groups.length === 0) return null;
+    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+      const groups = Array.isArray(parsed.groups) ? parsed.groups : [];
+      const result: CommitGroup[] = [];
+      for (const g of groups) {
+        if (typeof g !== "object" || g === null) continue;
+        if (!Array.isArray(g.hunks) && !Array.isArray(g.files)) continue;
 
-    return { overallConfidence, groups };
+        const indices: number[] = g.hunks || (g.files ? [1] : []); // files→fake hunk
+        result.push({
+          hunks: indices.map((i: number) => ({ globalIndex: i, file: "" })),
+          message: g.message || "chore: update files",
+          confidence: (g.confidence === "high" || g.confidence === "medium" || g.confidence === "low") ? g.confidence : "medium",
+          turnIndices: Array.isArray(g.turnIndices) ? g.turnIndices : undefined,
+          note: g.note,
+        });
+      }
+      if (result.length > 0) {
+        return {
+          overallConfidence: (parsed.overallConfidence === "high" || parsed.overallConfidence === "medium" || parsed.overallConfidence === "low") ? parsed.overallConfidence : "medium",
+          groups: result,
+        };
+      }
+    }
   } catch {
-    return null;
+    // JSON parse failed — not unexpected for this fallback path
   }
+
+  return null;
+}
+
+/** Last-resort heuristic parser */
+function tryParseHeuristic(text: string): HunkGroupingResult | null {
+  // Look for OVERALL line anywhere
+  const overallMatch = text.match(/OVERALL\s*:\s*(high|medium|low)/i);
+  const overall = (overallMatch?.[1]?.toLowerCase() || "medium") as "high" | "medium" | "low";
+
+  // Look for any COMMIT-like lines with following HUNKS
+  // Pattern: COMMIT: <msg> ... HUNKS: <nums>
+  const commitPattern = /COMMIT\s*:\s*(.+?)(?=\n\s*(?:COMMIT|HUNKS|OVERALL|$))/gis;
+  const hunkPattern = /HUNKS\s*:\s*([\d,\s]+)/gi;
+
+  const groups: CommitGroup[] = [];
+  let match: RegExpExecArray | null;
+
+  // Simple approach: find all COMMIT+HUNKS pairs
+  const lines = text.split("\n");
+  let currentMessage = "";
+  let currentHunks: number[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const commitMatch = trimmed.match(/^COMMIT\s*:\s*(.+)/i);
+    const hunksMatch = trimmed.match(/^HUNKS\s*:\s*([\d,\s]+)/i);
+
+    if (commitMatch) {
+      if (currentMessage && currentHunks.length > 0) {
+        groups.push({
+          hunks: currentHunks.map((i) => ({ globalIndex: i, file: "" })),
+          message: currentMessage,
+          confidence: "medium",
+        });
+      }
+      currentMessage = commitMatch[1].trim();
+      currentHunks = [];
+    } else if (hunksMatch && currentMessage) {
+      currentHunks = hunksMatch[1].split(/[,\s]+/).map(Number).filter((n) => n > 0);
+    }
+  }
+
+  // Flush last group
+  if (currentMessage && currentHunks.length > 0) {
+    groups.push({
+      hunks: currentHunks.map((i) => ({ globalIndex: i, file: "" })),
+      message: currentMessage,
+      confidence: "medium",
+    });
+  }
+
+  if (groups.length === 0) {
+    // Try another pattern: any line with [HN] references
+    const hunkRefPattern = /\[?H(\d+)\]?/gi;
+    const allHunks = new Set<number>();
+    while ((match = hunkRefPattern.exec(text)) !== null) {
+      allHunks.add(parseInt(match[1], 10));
+    }
+    if (allHunks.size > 0) {
+      groups.push({
+        hunks: [...allHunks].map((i) => ({ globalIndex: i, file: "" })),
+        message: "chore: update files",
+        confidence: "low",
+        note: "heuristic extraction — AI did not follow format",
+      });
+    }
+  }
+
+  return groups.length > 0 ? { overallConfidence: overall, groups } : null;
 }
 
 /**
@@ -497,7 +672,10 @@ export async function analyzeDiffIntent(
 
   // Parse diff into numbered hunks
   const diffHunks = parseDiffHunks(diff);
-  if (diffHunks.length === 0) return null;
+  if (diffHunks.length === 0) {
+    console.warn("[pi-git] analyzeDiffIntent: no diff hunks found");
+    return null;
+  }
 
   const numberedHunksText = formatNumberedHunks(diffHunks);
 
@@ -513,10 +691,45 @@ export async function analyzeDiffIntent(
       temperature: 0,
     });
 
-    if (!result) return null;
+    if (!result) {
+      console.warn("[pi-git] analyzeDiffIntent: AI returned null (no model/auth?)");
+      // Write debug file for null case
+      try {
+        const debugDir = join(tmpdir(), "pi-git-debug");
+        mkdirSync(debugDir, { recursive: true });
+        writeFileSync(
+          join(debugDir, `ai-null-${Date.now()}.txt`),
+          `aiComplete returned null.\nPrompt length: ${userMessage.length} chars`,
+          "utf-8",
+        );
+      } catch { /* ignore */ }
+      return null;
+    }
+
+    console.log(
+      `[pi-git] analyzeDiffIntent: AI response (${result.text.length} chars, ` +
+      `model=${result.model.provider}/${result.model.id})`,
+    );
+
+    // Write AI response to debug file for post-session inspection
+    try {
+      const debugDir = join(tmpdir(), "pi-git-debug");
+      mkdirSync(debugDir, { recursive: true });
+      writeFileSync(
+        join(debugDir, `ai-response-${Date.now()}.txt`),
+        `=== PROMPT ===\n${userMessage}\n\n=== RESPONSE ===\n${result.text}`,
+        "utf-8",
+      );
+    } catch { /* best-effort debug logging */ }
 
     const grouping = parseHunkGroupingResult(result.text);
-    if (!grouping) return null;
+    if (!grouping) {
+      console.warn(
+        `[pi-git] analyzeDiffIntent: parseHunkGroupingResult FAILED. ` +
+        `Response (first 300 chars): ${result.text.substring(0, 300)}`,
+      );
+      return null;
+    }
 
     // Enrich DiffHunkRef with file paths from the parsed DiffHunk array
     const hunkMap = new Map<number, DiffHunk>();

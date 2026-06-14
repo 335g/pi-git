@@ -47,6 +47,13 @@ export async function batchCommit(
 }> {
   const lang = langOverride ?? getLanguage(ctx.cwd);
 
+  // Immediate debug: write marker file to confirm code is loaded
+  try {
+    const dbg = join(tmpdir(), "pi-git-debug");
+    mkdirSync(dbg, { recursive: true });
+    writeFileSync(join(dbg, `batchCommit-called-${Date.now()}.txt`), `turnCount=${turnLog.turnCount} diffLen=${0}`);
+  } catch { /* */ }
+
   // 1. Pre-flight checks
   await footerManager.setPhase("collectDiff", lang);
 
@@ -85,6 +92,11 @@ export async function batchCommit(
 
   const turnLogText = turnLog.formatForPrompt();
 
+  console.log(
+    `[pi-git] batchCommit: turnLog has ${turnLog.turnCount} turns, ` +
+    `turnLogText.length=${turnLogText.length}`,
+  );
+
   let result: {
     committed: number;
     failed: number;
@@ -95,6 +107,7 @@ export async function batchCommit(
 
   // Try intent-based analysis when TurnLog is available
   if (turnLogText) {
+    ctx.ui.notify(`[debug] Intent analysis: TurnLog=${turnLog.turnCount} turns, ${turnLogText.length} chars`, "info");
     const intentResult = await analyzeDiffIntent(
       pi,
       ctx,
@@ -104,6 +117,7 @@ export async function batchCommit(
     );
 
     if (intentResult) {
+      ctx.ui.notify(`[debug] Intent SUCCESS: overall=${intentResult.overallConfidence}, ${intentResult.groups.length} groups`, "info");
       const diffHunks = parseDiffHunks(diff);
       const validated = validateHunkCoverage(
         intentResult.groups,
@@ -143,6 +157,8 @@ export async function batchCommit(
           isReview,
         );
       }
+    } else {
+      ctx.ui.notify("[debug] Intent analysis returned null — falling back to diff-based", "info");
     }
   }
 
