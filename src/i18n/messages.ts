@@ -151,11 +151,11 @@ export const messages = {
 
     // ── diff-analyzer.ts: intent-based system prompt ──────────
     "diffAnalyzer.intentSystemPrompt":
-      'Group numbered diff hunks [H1]..[HN] into logical commits based on conversation history.\n\nRULES:\n1. Same conversation intent → same commit group.\n2. Independent tasks in one turn → split.\n3. Related changes across turns (same feature) → merge.\n4. Hunks with no conversation match → separate group (CONF: low).\n5. Every [HN] MUST be in exactly one group.\n\nMESSAGES: Conventional Commits, Japanese, imperative, ≤50 chars.\n\nOUTPUT — tagged-line format ONLY. No JSON, no markdown, no explanations:\n\nOVERALL: high|medium|low\n\nCOMMIT: type(scope): subject\nHUNKS: 1,3\nCONF: high|medium|low\nTURNS: 1,2\n\nCOMMIT: type: subject\nHUNKS: 2\nCONF: low\nNOTE: reason for low confidence\n\nSeparate groups with a blank line. End after the last group.',
+      'Group numbered hunks [H1]..[HN] into commits.\n\nOutput tagged lines only, starting with OVERALL:, then COMMIT:/HUNKS:/CONF: blocks separated by blank lines. No other text.',
 
     // ── diff-analyzer.ts: intent-based user prompt ────────────
     "diffAnalyzer.intentBuildPrompt":
-      '=== CONVERSATION HISTORY ===\n{turnLogText}\n\n=== NUMBERED DIFF HUNKS ===\n{numberedHunksText}\n\nGroup numbered hunks into commits. Conversation is primary for boundaries.\n\nOutput tagged-line format (no JSON, no markdown):\n\nOVERALL: medium\n\nCOMMIT: feat(auth): ログイン機能を追加\nHUNKS: 1,3\nCONF: high\nTURNS: 1\n\nCOMMIT: chore: その他\nHUNKS: 2\nCONF: low\nNOTE: 会話未対応',
+      '=== CONVERSATION HISTORY ===\n{turnLogText}\n\n=== NUMBERED DIFF HUNKS ===\n{numberedHunksText}\n\nGroup the hunks into commits. Output tagged lines:',
 
     // ── diff-analyzer.ts: intent-based fallback notification ──
     "diffAnalyzer.intentLowConfidence": "会話ログとdiffの乖離が大きいため、diffベースの分割に切り替えます。",
@@ -349,11 +349,11 @@ export const messages = {
 
     // ── diff-analyzer.ts: intent-based system prompt ──────────
     "diffAnalyzer.intentSystemPrompt":
-      '番号付きdiff hunk [H1]..[HN] を会話履歴に基づいてコミットにグループ化せよ。\n\nルール:\n1. 同じ会話意図のhunk → 同じグループ\n2. 1ターン内の独立したタスク → 分割\n3. 複数ターン跨る関連変更（同じ機能） → 統合\n4. 会話未対応のhunk → 別グループ（CONF: low）\n5. 全ての [HN] を必ず1つのグループに割り当てること\n\nメッセージ: Conventional Commits、日本語、命令形、50文字以内。\n\n出力 — タグ付き行形式のみ。JSON不可、説明文不可:\n\nOVERALL: high|medium|low\n\nCOMMIT: type(scope): subject\nHUNKS: 1,3\nCONF: high|medium|low\nTURNS: 1,2\n\nCOMMIT: type: subject\nHUNKS: 2\nCONF: low\nNOTE: 低確信度の理由\n\nグループ間は空行で区切る。最終グループの後ろに何も書かない。',
+      'Group numbered hunks [H1]..[HN] into commits.\n\nOutput tagged lines only, starting with OVERALL:, then COMMIT:/HUNKS:/CONF: blocks separated by blank lines. No other text.',
 
     // ── diff-analyzer.ts: intent-based user prompt ────────────
     "diffAnalyzer.intentBuildPrompt":
-      '=== 会話履歴 ===\n{turnLogText}\n\n=== 番号付きDIFF HUNK ===\n{numberedHunksText}\n\n会話履歴に基づいてhunkをグループ化せよ。\n\nタグ付き行形式で出力せよ（JSON不可、マークダウン不可）:\n\nOVERALL: medium\n\nCOMMIT: feat(auth): ログイン機能を追加\nHUNKS: 1,3\nCONF: high\nTURNS: 1\n\nCOMMIT: chore: その他\nHUNKS: 2\nCONF: low\nNOTE: 会話未対応',
+      '=== CONVERSATION HISTORY ===\n{turnLogText}\n\n=== NUMBERED DIFF HUNKS ===\n{numberedHunksText}\n\nGroup the hunks into commits. Output tagged lines:',
 
     // ── diff-analyzer.ts: intent-based fallback notification ──
     "diffAnalyzer.intentLowConfidence": "会話ログとdiffの乖離が大きいため、diffベースの分割に切り替えます。",
