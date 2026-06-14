@@ -1,4 +1,0 @@
-lang = "ja"
-auto_agg_commit = true
-analysis_model = ""
-auto_agg_commit_mode = "accumulate"
