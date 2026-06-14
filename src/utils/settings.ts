@@ -90,6 +90,7 @@ export const DEFAULT_SETTINGS: PiGitSettings = {
 export const GLOBAL_CONFIG_DIR = join(homedir(), ".config", "pi-git");
 export const GLOBAL_SETTINGS_FILE = join(GLOBAL_CONFIG_DIR, "settings.json");
 const LOCAL_SETTINGS_FILE = "pi-git.toml";
+const LOCAL_SETTINGS_DIR = ".pi-git";
 const LEGACY_LOCAL_PATH = join(".pi-git", "settings.json");
 
 // ───────────────────────────────────────────────
@@ -116,7 +117,17 @@ export function getLocalSettingsPath(cwd?: string): string | null {
       stdio: ["pipe", "pipe", "ignore"],
     }).trim();
     if (!repoRoot) return null;
-    return join(repoRoot, LOCAL_SETTINGS_FILE);
+
+    // Prefer .pi-git/pi-git.toml (auto-excluded from git)
+    const newPath = join(repoRoot, LOCAL_SETTINGS_DIR, LOCAL_SETTINGS_FILE);
+    if (existsSync(newPath)) return newPath;
+
+    // Fall back to repo-root pi-git.toml (legacy location)
+    const legacyPath = join(repoRoot, LOCAL_SETTINGS_FILE);
+    if (existsSync(legacyPath)) return legacyPath;
+
+    // Return the new path as default for new repos
+    return newPath;
   } catch {
     return null;
   }
