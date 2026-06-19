@@ -6,6 +6,7 @@
  */
 
 import { diagIncr } from "../utils/diagnostics.js";
+import { t } from "../utils/lang.js";
 import type { Hunk } from "../types.js";
 
 /** Generic commit message patterns — messages matching these lack specificity */
@@ -166,13 +167,22 @@ export function sanitizeCommitMessage(
 /**
  * Generate a fallback message when AI generation fails entirely.
  */
-export function generateFallbackMessage(files: string[]): string {
+export function generateFallbackMessage(
+  files: string[],
+  lang = "en",
+): string {
   const type = inferTypeFromFiles(files);
   if (files.length === 1) {
     const fileName = files[0].split("/").pop() || files[0];
-    return `${type}: update ${fileName}`;
+    return t(lang, "fallbackCommitMessage.singleFile", {
+      type,
+      file: fileName,
+    });
   }
-  return `${type}: update ${files.length} files`;
+  return t(lang, "fallbackCommitMessage.multipleFiles", {
+    type,
+    count: String(files.length),
+  });
 }
 
 /**

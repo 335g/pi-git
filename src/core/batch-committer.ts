@@ -80,6 +80,7 @@ const MIN_COOCCURRENCE = 2;
 function buildGroupsFromTurnLog(
   diffHunks: DiffHunk[],
   turnLogInstance: TurnLog,
+  lang = "en",
 ): CommitGroup[] {
   const entries = turnLogInstance.getEntries();
 
@@ -111,11 +112,11 @@ function buildGroupsFromTurnLog(
 
   for (const [, hunks] of turnGroups) {
     if (hunks.length <= 3) {
-      groups.push(makeHeuristicGroup(hunks, "medium"));
+      groups.push(makeHeuristicGroup(hunks, "medium", lang));
     } else {
       const clusters = clusterByCooccurrence(hunks, cooccurrence);
       for (const cluster of clusters) {
-        groups.push(makeHeuristicGroup(cluster, "low"));
+        groups.push(makeHeuristicGroup(cluster, "low", lang));
       }
     }
   }
@@ -124,7 +125,7 @@ function buildGroupsFromTurnLog(
   if (unassigned.length > 0) {
     groups.push({
       hunks: unassigned.map((h) => ({ globalIndex: h.globalIndex, file: h.file })),
-      message: generateFallbackMessage(unassigned.map((h) => h.file)),
+      message: generateFallbackMessage(unassigned.map((h) => h.file), lang),
       confidence: "low",
       note: "TurnLogに記録のない変更（人手編集の可能性）",
     });
@@ -191,9 +192,10 @@ function clusterByCooccurrence(
 function makeHeuristicGroup(
   hunks: DiffHunk[],
   confidence: "medium" | "low",
+  lang = "en",
 ): CommitGroup {
   const files = [...new Set(hunks.map((h) => h.file))];
-  const message = generateFallbackMessage(files);
+  const message = generateFallbackMessage(files, lang);
   return {
     hunks: hunks.map((h) => ({ globalIndex: h.globalIndex, file: h.file })),
     message: sanitizeCommitMessage(message, files),
@@ -295,11 +297,12 @@ export async function batchCommit(
     if (isCheapModel(model?.id)) {
       diagIncr("cheapModel_skippedAI");
       const cheapDiffHunks = parseDiffHunks(diff);
-      const cheapGroups = buildGroupsFromTurnLog(cheapDiffHunks, turnLog);
+      const cheapGroups = buildGroupsFromTurnLog(cheapDiffHunks, turnLog, lang);
       if (cheapGroups.length > 0) {
         const validated = validateHunkCoverage(
           cheapGroups,
           cheapDiffHunks.length,
+          lang,
         );
         diagIncr("intentPath_fallback");
         result = await commitIntentGroups(
@@ -323,6 +326,7 @@ export async function batchCommit(
         const validated = validateHunkCoverage(
           intentResult.groups,
           diffHunks.length,
+          lang,
         );
 
         // Step 2: verify self-reported confidence (uses catch-all groups from step 1)
@@ -374,11 +378,13 @@ export async function batchCommit(
       const heuristicGroups = buildGroupsFromTurnLog(
         heuristicDiffHunks,
         turnLog,
+        lang,
       );
       if (heuristicGroups.length > 0) {
         const validated = validateHunkCoverage(
           heuristicGroups,
           heuristicDiffHunks.length,
+          lang,
         );
         diagIncr("intentPath_fallback");
         result = await commitIntentGroups(
@@ -558,7 +564,7 @@ async function commitDiffBasedHunks(
   }
 
   await footerManager.setPhase("generateMessage", lang);
-  const processed = processHunks(hunks);
+  const processed = processHunks(hunks, lang);
 
   if (processed.length === 0) {
     return {

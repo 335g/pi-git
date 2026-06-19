@@ -816,6 +816,7 @@ async function analyzeDiffIntentBatched(
 export function validateHunkCoverage(
   groups: CommitGroup[],
   totalHunks: number,
+  lang = "en",
 ): CommitGroup[] {
   const assigned = new Set<number>();
   const result: CommitGroup[] = [];
@@ -842,7 +843,7 @@ export function validateHunkCoverage(
   if (unassigned.length > 0) {
     result.push({
       hunks: unassigned,
-      message: "chore: その他の変更を適用",
+      message: t(lang, "fallbackCommitMessage.catchAll"),
       confidence: "low",
       note: "AIがグループ化できなかったhunkの自動回収",
     });
@@ -855,14 +856,14 @@ export function validateHunkCoverage(
  * Post-process AI-generated hunks: sanitize commit messages, deduplicate files
  * across hunks (each file belongs only to its first hunk), and remove empty hunks.
  */
-export function processHunks(hunks: Hunk[]): Hunk[] {
+export function processHunks(hunks: Hunk[], lang = "en"): Hunk[] {
   const sanitized = hunks.map(sanitizeHunk);
   const seenFiles = new Set<string>();
   return sanitized
     .map((hunk) => {
       // Check for generic messages and replace with file-based fallback
       if (isGenericMessage(hunk.message)) {
-        return { ...hunk, message: generateFallbackMessage(hunk.files) };
+        return { ...hunk, message: generateFallbackMessage(hunk.files, lang) };
       }
       return hunk;
     })
