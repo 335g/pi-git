@@ -17,8 +17,10 @@ import { handleAggCommit } from "./commands/agg-commit.js";
 import { handleConfig } from "./commands/config.js";
 import { handleDiagnostics } from "./commands/diagnostics.js";
 import { t } from "./utils/lang.js";
+import { diagIncr } from "./utils/diagnostics.js";
 import { recoverOrphanedStashes } from "./core/orphan-recovery.js";
 import { turnLog } from "./core/turn-log.js";
+import { maybeClearTurnLogOnCleanStart } from "./core/turn-log-cleaner.js";
 import { isGitRepository, hasChanges } from "./core/git.js";
 import { footerManager } from "./utils/footer-manager.js";
 import {
@@ -35,6 +37,7 @@ export default function (pi: ExtensionAPI) {
 
       if (ctx.hasUI) {
         turnLog.initialize(ctx.cwd); // load persisted TurnLog from disk
+        await maybeClearTurnLogOnCleanStart(pi, ctx.cwd);
         footerManager.initialize(pi, ctx.ui, ctx.cwd);
         await recoverOrphanedStashes(pi, ctx);
         await footerManager.refresh();
@@ -95,6 +98,32 @@ export default function (pi: ExtensionAPI) {
         if (ctx.hasUI) {
           ctx.ui.notify(`[pi-git] /git-diagnostics error: ${msg}`, "error");
         }
+      }
+    },
+  });
+
+  pi.registerCommand("git-clear-turnlog", {
+    description: "Clear the accumulated TurnLog manually",
+    handler: async (args, ctx) => {
+      try {
+        if (!ctx.hasUI) return;
+        const lang = getLanguage(ctx.cwd);
+        const trimmed = args.trim().toLowerCase();
+
+        if (trimmed === "--help") {
+          ctx.ui.notify(t(lang, "clearTurnlog.help"), "info");
+          return;
+        }
+
+        turnLog.clear();
+        clearPendingPrompts();
+        diagIncr("turnLog_manuallyCleared");
+        await footerManager.refresh();
+        ctx.ui.notify(t(lang, "clearTurnlog.success"), "info");
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        const lang = getLanguage(ctx.cwd);
+        ctx.ui.notify(t(lang, "clearTurnlog.error", { error: msg }), "error");
       }
     },
   });

@@ -175,6 +175,12 @@ export const messages = {
     "batchCommit.modeSwitchNotice":
       "Switched to accumulate mode. Changes will accumulate across turns. Use /git-agg-commit to commit.",
 
+    // ── clear-turnlog command ──────────────────────────────────
+    "clearTurnlog.success": "TurnLog cleared.",
+    "clearTurnlog.error": "[pi-git] /git-clear-turnlog error: {error}",
+    "clearTurnlog.help":
+      "/git-clear-turnlog [--help]\n\nClear the accumulated TurnLog manually.\n\nThis removes all conversation context used by /git-agg-commit.",
+
     // ── auto-commit-message.ts: system prompt ──────────────────
     "autoCommitMsg.systemPrompt":
       "You are a commit message generator. From the following information, understand what changes were made and generate a single Conventional Commit message.\n\nThe GIT DIFF is the most reliable source of what actually changed. Use it as the primary driver for the commit message. The user's request provides intent, and the assistant's response and changed files list are supplementary.\n\nRules:\n- Choose type from: feat, fix, docs, style, refactor, test, chore\n- Write the subject in English\n- Keep subject under 50 characters\n- Use imperative mood\n- Include scope only if clearly inferable from the diff\n\nDo NOT generate vague, non-specific messages such as:\n- \"chore: apply changes\", \"chore: update files\", \"chore: fix\", \"chore: modify\"\n- Any message that only uses generic verbs without referencing what actually changed in the diff\n- Any message whose subject appears nowhere in the GIT DIFF\n\nGood examples (specific, grounded in diff):\n→ feat(auth): add login form\n→ fix(payment): add null check in processor\n\nBad examples (NEVER generate):\n→ chore: apply changes\n→ chore: update files\n→ fix: fix issue\n\nReturn ONLY the commit message string. No explanations or code fences.",
@@ -372,6 +378,12 @@ export const messages = {
       "{count}ターンの未コミット変更が蓄積されています。/git-agg-commit でコミットしてください。",
     "batchCommit.modeSwitchNotice":
       "accumulateモードに切り替えました。変更はターンごとに蓄積されます。コミットするには /git-agg-commit を実行してください。",
+
+    // ── clear-turnlog command ──────────────────────────────────
+    "clearTurnlog.success": "TurnLog をクリアしました。",
+    "clearTurnlog.error": "[pi-git] /git-clear-turnlog エラー: {error}",
+    "clearTurnlog.help":
+      "/git-clear-turnlog [--help]\n\n蓄積された TurnLog を手動でクリアします。\n\nこれにより /git-agg-commit で使用される会話コンテキストが削除されます。",
 
     // ── auto-commit-message.ts: system prompt ──────────────────
     "autoCommitMsg.systemPrompt":
