@@ -18,6 +18,8 @@ pi-git は各 `agent_end` で会話ログ（TurnLog）を自動蓄積し、`/git
   - system プロンプトはエントリあたり最大 1,000 文字
   - user プロンプトはエントリあたり最大 1,500 文字
   - 超過分は切り詰められます
+- working tree がクリーンな状態で Pi を起動すると、古い TurnLog は自動的にクリアされます
+- `/git-clear-turnlog` で手動クリアも可能です（`/git-clear-turnlog --help` でヘルプ）
 
 ### Footer 表示
 
@@ -62,6 +64,7 @@ AI プロンプトの優先順位: **diff（最優先） > ファイル共起 > 
 - `session_shutdown` での自動コミットは未実装
 - 確認ダイアログでの TurnLog 抜粋表示は未実装
 - 元の system/user プロンプトは `before_agent_start` イベントから取得します。`agent_end` までの間にセッションが切り替わるなど、対応する `before_agent_start` が失われた場合はプロンプトが記録されません
+- 同じリポジトリで複数の Pi セッションを並行して動作させる場合、TurnLog は単一ファイルを共有するため、一方のセッションのクリアが他方に影響することがあります
 
 ## トラブルシューティング
 
