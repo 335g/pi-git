@@ -57,6 +57,16 @@ export interface DiagSnapshot {
   confidenceDowngrade_overconfidentModel: number;
   /** Overall confidence downgraded from "high" to "medium" (>30% low-confidence hunks) */
   confidenceDowngrade_highToMedium: number;
+  /** Overall confidence capped at "medium" because a catch-all group was present */
+  confidenceDowngrade_catchAllHigh: number;
+
+  // ── group message generation (shared across models) ───────────
+  /** A generic group message was regenerated from the diff */
+  groupMessage_regeneratedGeneric: number;
+  /** AI-generated group message was still generic and fell back to file-based message */
+  groupMessage_aiGenericFallback: number;
+  /** Cheap model successfully generated a non-generic group message */
+  cheapModel_messageGenerated: number;
 
   // ── auto-commit-message quality ───────────────────────────────
   /** isGenericMessage() returned true */
@@ -99,6 +109,11 @@ const counters: DiagSnapshot = {
 
   confidenceDowngrade_overconfidentModel: 0,
   confidenceDowngrade_highToMedium: 0,
+  confidenceDowngrade_catchAllHigh: 0,
+
+  groupMessage_regeneratedGeneric: 0,
+  groupMessage_aiGenericFallback: 0,
+  cheapModel_messageGenerated: 0,
 
   msgIsGeneric: 0,
   msgRefineTriggered: 0,
