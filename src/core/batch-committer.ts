@@ -25,7 +25,12 @@ import { runHunkReview } from "./review.js";
 import { turnLog, TurnLog } from "./turn-log.js";
 import type { TurnEntry } from "./turn-log.js";
 import { resolveModel, isCheapModel } from "./resolve-model.js";
-import { sanitizeCommitMessage, generateFallbackMessage } from "./commit-message.js";
+import {
+  sanitizeCommitMessage,
+  generateFallbackMessage,
+  isGenericMessage,
+} from "./commit-message.js";
+import { aiComplete } from "./ai.js";
 import { diagIncr } from "../utils/diagnostics.js";
 import type { CommitGroup, DiffHunk, Hunk } from "../types.js";
 
@@ -41,11 +46,25 @@ import type { CommitGroup, DiffHunk, Hunk } from "../types.js";
  * If >50% of hunks are in low-confidence groups but overallConfidence
  * says otherwise, the model is likely overconfident — downgrade.
  */
-function verifyConfidence(
+export function verifyConfidence(
   result: { overallConfidence: "high" | "medium" | "low"; groups: CommitGroup[] },
   totalHunks: number,
+  lang = "en",
 ): { overallConfidence: "high" | "medium" | "low"; groups: CommitGroup[] } {
   if (totalHunks === 0) return result;
+
+  // A catch-all group means some hunks could not be explained — cap confidence at medium.
+  const catchAllMessage = t(lang, "fallbackCommitMessage.catchAll");
+  const hasCatchAll = result.groups.some(
+    (g) =>
+      g.note?.includes("自動回収") ||
+      g.note?.includes("catch-all") ||
+      g.message === catchAllMessage,
+  );
+  if (hasCatchAll && result.overallConfidence === "high") {
+    diagIncr("confidenceDowngrade_catchAllHigh");
+    result = { ...result, overallConfidence: "medium" };
+  }
 
   const lowHunkCount = result.groups
     .filter((g) => g.confidence === "low")
@@ -61,6 +80,146 @@ function verifyConfidence(
   if (lowFraction > 0.3 && result.overallConfidence === "high") {
     diagIncr("confidenceDowngrade_highToMedium");
     return { ...result, overallConfidence: "medium" };
+  }
+
+  return result;
+}
+
+// ───────────────────────────────────────────────
+// Group message generation (shared across models)
+// ───────────────────────────────────────────────
+
+/** Maximum diff snippet chars to send for per-group message generation */
+const MAX_GROUP_DIFF_SNIPPET_CHARS = 8_000;
+
+/** Maximum output tokens for a single subject line */
+const MAX_MESSAGE_GENERATION_TOKENS = 128;
+
+/**
+ * Extract a focused diff snippet for a commit group.
+ * Includes file headers and the group's hunks; truncates if oversized.
+ */
+export function extractDiffSnippetForGroup(
+  group: CommitGroup,
+  diffHunks: DiffHunk[],
+  maxChars = MAX_GROUP_DIFF_SNIPPET_CHARS,
+): string {
+  const hunkMap = new Map(diffHunks.map((h) => [h.globalIndex, h]));
+  const lines: string[] = [];
+  let currentFile: string | null = null;
+
+  for (const ref of group.hunks) {
+    const h = hunkMap.get(ref.globalIndex);
+    if (!h) continue;
+
+    if (h.file !== currentFile) {
+      currentFile = h.file;
+      if (h.isAtomic) {
+        // Atomic files carry the full file diff in content
+        lines.push(h.content);
+        continue;
+      }
+      lines.push(...h.fileHeader);
+    }
+
+    if (!h.isAtomic) {
+      lines.push(h.content);
+    }
+  }
+
+  let snippet = lines.join("\n");
+  if (snippet.length > maxChars) {
+    snippet = snippet.substring(0, maxChars);
+    const lastNewline = snippet.lastIndexOf("\n");
+    if (lastNewline > 0) {
+      snippet = snippet.substring(0, lastNewline);
+    }
+    snippet += "\n... (truncated)";
+  }
+  return snippet;
+}
+
+/**
+ * Generate a Conventional Commit message for one group using a lightweight AI prompt.
+ * Falls back to a file-based generic message if AI is unavailable or returns generic text.
+ */
+async function generateMessageForGroup(
+  pi: ExtensionAPI,
+  ctx: ExtensionCommandContext,
+  group: CommitGroup,
+  diffHunks: DiffHunk[],
+  lang: string,
+): Promise<string> {
+  const files = [...new Set(group.hunks.map((h) => h.file).filter(Boolean))];
+  if (files.length === 0) {
+    return generateFallbackMessage(["unknown"], lang);
+  }
+
+  const snippet = extractDiffSnippetForGroup(group, diffHunks);
+
+  const systemPrompt = t(lang, "diffAnalyzer.cheapModelSystemPrompt");
+  const userMessage = t(lang, "diffAnalyzer.cheapModelBuildPrompt", {
+    files: files.join(", "),
+    diffSnippet: snippet,
+  });
+
+  try {
+    const result = await aiComplete(ctx, {
+      systemPrompt,
+      userMessage,
+      maxTokens: MAX_MESSAGE_GENERATION_TOKENS,
+      temperature: 0,
+    });
+
+    if (!result?.text) {
+      return generateFallbackMessage(files, lang);
+    }
+
+    const sanitized = sanitizeCommitMessage(result.text, files);
+    if (isGenericMessage(sanitized)) {
+      diagIncr("groupMessage_aiGenericFallback");
+      return generateFallbackMessage(files, lang);
+    }
+
+    if (isCheapModel(result.model.id)) {
+      diagIncr("cheapModel_messageGenerated");
+    }
+    return sanitized;
+  } catch {
+    return generateFallbackMessage(files, lang);
+  }
+}
+
+/**
+ * Finalize commit group messages: sanitize all messages and regenerate generic ones.
+ * Ensures both cheap-model heuristic groups and rich-model intent groups meet the
+ * same quality bar before committing.
+ */
+async function finalizeGroupMessages(
+  pi: ExtensionAPI,
+  ctx: ExtensionCommandContext,
+  groups: CommitGroup[],
+  diffHunks: DiffHunk[],
+  lang: string,
+): Promise<CommitGroup[]> {
+  const result: CommitGroup[] = [];
+
+  for (const group of groups) {
+    const files = [...new Set(group.hunks.map((h) => h.file).filter(Boolean))];
+    let message = sanitizeCommitMessage(group.message, files);
+
+    if (isGenericMessage(message)) {
+      diagIncr("groupMessage_regeneratedGeneric");
+      message = await generateMessageForGroup(
+        pi,
+        ctx,
+        group,
+        diffHunks,
+        lang,
+      );
+    }
+
+    result.push({ ...group, message });
   }
 
   return result;
@@ -293,7 +452,7 @@ export async function batchCommit(
   if (turnLogText) {
     const model = resolveModel(ctx);
 
-    // Cheap model shortcut: skip AI grouping, go straight to TurnLog heuristic
+    // Cheap model shortcut: skip AI grouping, use deterministic TurnLog heuristic
     if (isCheapModel(model?.id)) {
       diagIncr("cheapModel_skippedAI");
       const cheapDiffHunks = parseDiffHunks(diff);
@@ -304,9 +463,12 @@ export async function batchCommit(
           cheapDiffHunks.length,
           lang,
         );
+        const finalized = await finalizeGroupMessages(
+          pi, ctx, validated, cheapDiffHunks, lang,
+        );
         diagIncr("intentPath_fallback");
         result = await commitIntentGroups(
-          pi, ctx, validated, cheapDiffHunks, diff, lang, isReview,
+          pi, ctx, finalized, cheapDiffHunks, diff, lang, isReview,
         );
       }
     } else {
@@ -333,6 +495,7 @@ export async function batchCommit(
         const verified = verifyConfidence(
           { ...intentResult, groups: validated },
           diffHunks.length,
+          lang,
         );
 
         if (verified.overallConfidence === "low") {
@@ -341,28 +504,23 @@ export async function batchCommit(
             t(lang, "diffAnalyzer.intentLowConfidence"),
             "info",
           );
-        } else if (verified.overallConfidence === "medium") {
-          ctx.ui.notify(
-            t(lang, "diffAnalyzer.intentMediumConfidence"),
-            "warning",
-          );
-          diagIncr("intentPath_success");
-          result = await commitIntentGroups(
-            pi,
-            ctx,
-            verified.groups,
-            diffHunks,
-            diff,
-            lang,
-            isReview,
-          );
         } else {
-          // high
+          // Step 3: finalize messages — sanitize and regenerate generic ones
+          const finalized = await finalizeGroupMessages(
+            pi, ctx, verified.groups, diffHunks, lang,
+          );
+
+          if (verified.overallConfidence === "medium") {
+            ctx.ui.notify(
+              t(lang, "diffAnalyzer.intentMediumConfidence"),
+              "warning",
+            );
+          }
           diagIncr("intentPath_success");
           result = await commitIntentGroups(
             pi,
             ctx,
-            verified.groups,
+            finalized,
             diffHunks,
             diff,
             lang,
@@ -386,9 +544,12 @@ export async function batchCommit(
           heuristicDiffHunks.length,
           lang,
         );
+        const finalized = await finalizeGroupMessages(
+          pi, ctx, validated, heuristicDiffHunks, lang,
+        );
         diagIncr("intentPath_fallback");
         result = await commitIntentGroups(
-          pi, ctx, validated, heuristicDiffHunks, diff, lang, isReview,
+          pi, ctx, finalized, heuristicDiffHunks, diff, lang, isReview,
         );
       }
     }
