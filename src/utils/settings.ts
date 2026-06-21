@@ -24,10 +24,6 @@ export interface PiGitSettings {
   lang?: string;
   /** Model to use for diff analysis (format: "provider/model-id") */
   analysis_model?: string;
-  /** Whether auto-commit is enabled (accumulate mode only — per_turn was removed) */
-  auto_agg_commit?: boolean;
-  /** Commit mode: "accumulate" (default). "per_turn" is deprecated and treated as accumulate. */
-  auto_agg_commit_mode?: "accumulate";
   /** Number of accumulated turns before showing a commit reminder (0 = disabled) */
   batch_warn_turns?: number;
 }
@@ -60,18 +56,6 @@ export const VALID_KEYS_META: KeyMeta[] = [
     valid_values: "e.g., anthropic/claude-3-5-sonnet-20241022",
   },
   {
-    key: "auto_agg_commit",
-    type: "boolean",
-    messageKey: "config.keyDesc.auto_agg_commit",
-    valid_values: "true or false",
-  },
-  {
-    key: "auto_agg_commit_mode",
-    type: "string",
-    messageKey: "config.keyDesc.auto_agg_commit_mode",
-    valid_values: '"accumulate"',
-  },
-  {
     key: "batch_warn_turns",
     type: "number",
     messageKey: "config.keyDesc.batch_warn_turns",
@@ -82,8 +66,6 @@ export const VALID_KEYS_META: KeyMeta[] = [
 export const DEFAULT_SETTINGS: PiGitSettings = {
   lang: "en",
   analysis_model: "",
-  auto_agg_commit: false,
-  auto_agg_commit_mode: "accumulate",
   batch_warn_turns: 5,
 };
 
@@ -257,15 +239,6 @@ export function getLanguage(cwd?: string): string {
 export function getAnalysisModel(cwd?: string): string | undefined {
   const model = getSettings(cwd).analysis_model;
   return model?.trim() ? model.trim() : undefined;
-}
-
-export function getAutoAggCommit(cwd?: string): boolean {
-  return getSettings(cwd).auto_agg_commit === true;
-}
-
-export function getAutoAggCommitMode(cwd?: string): "accumulate" {
-  // "per_turn" was removed — always treat as accumulate
-  return "accumulate";
 }
 
 export function getBatchWarnTurns(cwd?: string): number {
