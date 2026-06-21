@@ -24,7 +24,6 @@ import { maybeClearTurnLogOnCleanStart } from "./core/turn-log-cleaner.js";
 import { isGitRepository, hasChanges } from "./core/git.js";
 import { footerManager } from "./utils/footer-manager.js";
 import {
-  getAutoAggCommit,
   getBatchWarnTurns,
   getLanguage,
 } from "./utils/settings.js";
@@ -135,11 +134,6 @@ export default function (pi: ExtensionAPI) {
     try {
       const isRepo = await isGitRepository(pi);
       if (!isRepo) return;
-
-      if (!getAutoAggCommit(ctx.cwd)) {
-        await footerManager.refresh();
-        return;
-      }
 
       if (!(await hasChanges(pi))) {
         await footerManager.refresh();
