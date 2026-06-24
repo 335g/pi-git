@@ -3,13 +3,9 @@ version: 1.0.0
 description: APM project for pi-git
 author: Yoshiki Kudo
 targets:
-- claude
+- agent-skills
 dependencies:
-  apm:
-  - mitsuhiko/agent-stuff/skills/mermaid
-  - mattpocock/skills/skills/productivity/grill-me
-  - mattpocock/skills/skills/productivity/handoff
-  - mattpocock/skills/skills/engineering/grill-with-docs
+  apm: []
   mcp: []
 includes: auto
 scripts: {}
