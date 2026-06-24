@@ -6,16 +6,18 @@ import { generateCommitMessageWithLLM } from "./llm-commit.js";
 /**
  * pi-git extension — `/commit` command
  *
- * Stages all current files and generates a Conventional Commits message
- * from the staged changes, then asks the user for confirmation before
- * executing the commit.
+ * Stages all current files and commits with the given message.
+ * If a message is provided inline (e.g. `/commit fix typo`), it is used
+ * directly without AI generation. Otherwise, generates a Conventional
+ * Commits message from the staged changes and asks for confirmation
+ * before executing the commit.
  *
  * Mirrors the workflow defined in `myskill/SKILL.md`.
  */
 export default function (pi: ExtensionAPI) {
 	pi.registerCommand("commit", {
 		description: "Stage all changes and generate a Conventional Commits message",
-		handler: async (_args, ctx) => {
+		handler: async (args, ctx) => {
 			const git = new GitOperations(pi);
 
 			// ── 0. Verify git repository ────────────────────────────────
@@ -46,12 +48,38 @@ export default function (pi: ExtensionAPI) {
 			// ── 4. Stage all files ──────────────────────────────────────
 			await git.stageAll();
 
-			// ── 5. Analyze changes ──────────────────────────────────────
+			// ── 5. Check if user provided an inline commit message ──────
+			// If args has text, use it directly without AI generation.
+			const inlineMessage = args?.trim();
+			if (inlineMessage) {
+				// Skip AI generation — commit directly with the provided message
+				try {
+					ctx.ui.notify(`Committing with provided message...`, "info");
+					const result = await git.commit(inlineMessage);
+					if (result.code === 0) {
+						ctx.ui.notify(
+							`Committed successfully:\n${result.stdout.trim() || inlineMessage.split("\n")[0]}`,
+							"info",
+						);
+					} else {
+						ctx.ui.notify(
+							`Commit failed (code ${result.code}):\n${result.stderr.trim() || "Unknown error"}`,
+							"error",
+						);
+					}
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error);
+					ctx.ui.notify(`Commit error: ${message}`, "error");
+				}
+				return;
+			}
+
+			// ── 6. Analyze changes ──────────────────────────────────────
 			const nameStatus = await git.getStagedNameStatus();
 			const stat = await git.getStagedStat();
 			const diff = await git.getStagedDiff();
 
-			// ── 6. Generate commit message via LLM ──────────────────────
+			// ── 7. Generate commit message via LLM ──────────────────────
 			// Uses pi's model (same as the current session), with heuristic
 			// fallback when the LLM is unavailable.
 			ctx.ui.notify("Generating commit message via LLM...", "info");
@@ -64,7 +92,7 @@ export default function (pi: ExtensionAPI) {
 				config,
 			);
 
-			// ── 7. User confirmation loop ───────────────────────────────
+			// ── 8. User confirmation loop ───────────────────────────────
 			let confirmed = false;
 			let cancelled = false;
 
@@ -140,7 +168,7 @@ export default function (pi: ExtensionAPI) {
 				return;
 			}
 
-			// ── 8. Execute commit ───────────────────────────────────────
+			// ── 9. Execute commit ───────────────────────────────────────
 			try {
 				const result = await git.commit(fullMessage);
 				if (result.code === 0) {
