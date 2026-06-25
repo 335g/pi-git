@@ -11,7 +11,7 @@ A [pi-coding-agent](https://github.com/earendil-works/pi-coding-agent) extension
 - **Inline message support** – `/commit fix typo` uses the message directly without AI generation
 - **AI-powered generation** – Leverages pi's LLM to produce Conventional Commits messages from staged diffs
 - **Heuristic fallback** – When the LLM is unavailable, generates a commit message from diff analysis
-- **Language support** – Commit body can be written in English or Japanese (configured via `.pi-git/config.toml`)
+- **Language support** – Commit message (subject and body) can be written in English or Japanese (configured via `.pi-git/config.toml`)
 - **Interactive confirmation** – Review, edit, or cancel the proposed commit message before executing
 - **Merge conflict detection** – Refuses to commit when a merge is in progress
 
@@ -64,7 +64,7 @@ Create `.pi-git/config.toml` in your project root to set the commit body languag
 
 ```toml
 # .pi-git/config.toml
-lang = "ja"   # Body in Japanese (default: "en" — English)
+lang = "ja"   # Commit message in Japanese (default: "en" — English)
 ```
 
 ## Commit Message Convention

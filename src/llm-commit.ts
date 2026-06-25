@@ -27,13 +27,18 @@ export async function generateCommitMessageWithLLM(
 			? "Write the body in Japanese (日本語)."
 			: "Write the body in English.";
 
+	const subjectLangInstruction =
+		lang === "ja"
+			? "Japanese (日本語), imperative plain form (連用形), lowercase (ひらがな優先), no period, 50 chars or fewer."
+			: "English, imperative present tense, lowercase, no period, 50 chars or fewer.";
+
 	const systemPrompt = [
 		"You are a commit message generator. Generate a Conventional Commits",
 		"commit message for the given staged changes.",
 		"",
 		"--- Rules ---",
 		"Subject format: `type(scope): brief summary`",
-		"Subject: English, imperative present tense, lowercase, no period, 50 chars or fewer.",
+		`Subject: ${subjectLangInstruction}`,
 		`Body: list each changed file, describe what changed and why. ${bodyLangInstruction}`,
 		"Footer: add `BREAKING CHANGE: ...` when there is a breaking change.",
 		"",

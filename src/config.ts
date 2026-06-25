@@ -6,7 +6,7 @@ import { parse } from "smol-toml";
  * Language configuration for commit messages.
  */
 export interface PiGitConfig {
-	/** Language for the commit body. `"ja"` → Japanese, anything else → English */
+	/** Language for the commit message (subject and body). `"ja"` → Japanese, anything else → English */
 	lang: string;
 }
 
@@ -34,7 +34,7 @@ export function loadConfig(cwd: string): PiGitConfig {
 }
 
 /**
- * Returns `true` when the body should be written in Japanese.
+ * Returns `true` when the commit message should be written in Japanese.
  */
 export function isJapanese(config: PiGitConfig): boolean {
 	return config.lang === "ja";

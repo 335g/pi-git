@@ -150,7 +150,7 @@ export function determineScope(nameStatusEntries: ParsedNameStatus[]): string | 
  * - No trailing period
  * - 50 chars or fewer when possible
  */
-function extractSubject(type: CommitType, nameStatusEntries: ParsedNameStatus[], diff: string): string {
+function extractSubject(type: CommitType, nameStatusEntries: ParsedNameStatus[], diff: string, jp: boolean): string {
 	const paths = nameStatusEntries.map((e) => e.path);
 	const statuses = nameStatusEntries.map((e) => e.status);
 
@@ -158,6 +158,72 @@ function extractSubject(type: CommitType, nameStatusEntries: ParsedNameStatus[],
 	const hasDeletions = statuses.includes("D");
 	const hasModifications = statuses.includes("M");
 	const hasRenames = statuses.includes("R");
+
+	if (jp) {
+		switch (type) {
+			case "feat": {
+				const newFiles = nameStatusEntries.filter((e) => e.status === "A").map((e) => e.path);
+				if (newFiles.length === 1) {
+					const name = newFiles[0].split("/").pop()?.replace(/\.[^.]+$/, "") ?? newFiles[0];
+					return `追加 ${name}`;
+				}
+				if (newFiles.length > 1) {
+					const dirs = [...new Set(newFiles.map((p) => p.split("/")[0]))];
+					if (dirs.length === 1) return `追加 ${dirs[0]} 関連`;
+					return "新規ファイルを追加";
+				}
+				return "新機能を追加";
+			}
+
+			case "fix": {
+				const fixMatch = diff.match(/\b(fix|bug|error|issue|crash|修正|バグ|不具合)\s+(\S+)/i);
+				if (fixMatch) {
+					const target = fixMatch[2].replace(/[.:,;!?]$/, "").toLowerCase();
+					return `修正 ${target}`;
+				}
+				return "不具合を修正";
+			}
+
+			case "docs": {
+				const docFiles = paths.filter((p) => /\.md$/i.test(p));
+				if (docFiles.length === 1) {
+					const name = docFiles[0].split("/").pop()?.replace(/\.md$/, "") ?? docFiles[0];
+					return `更新 ${name}`;
+				}
+				if (docFiles.length > 1) return "ドキュメントを更新";
+				return "ドキュメントを更新";
+			}
+
+			case "test": {
+				if (hasAdditions) return "テストを追加";
+				return "テストを更新";
+			}
+
+			case "chore":
+				return "設定を更新";
+
+			case "style":
+				return "コードスタイルを統一";
+
+			case "perf":
+				return "パフォーマンスを改善";
+
+			case "refactor":
+			default: {
+				if (hasRenames) {
+					const renamed = nameStatusEntries.filter((e) => e.status === "R");
+					if (renamed.length === 1) {
+						const from = renamed[0].oldPath?.split("/").pop() ?? "";
+						const to = renamed[0].path.split("/").pop() ?? "";
+						return `リネーム ${from} → ${to}`;
+					}
+					return "ファイルをリネーム";
+				}
+				if (hasDeletions && !hasAdditions) return "不要コードを削除";
+				return "コードを整理";
+			}
+		}
+	}
 
 	switch (type) {
 		case "feat": {
@@ -446,7 +512,7 @@ export function generateCommitMessage(
 
 	const type = determineType(entries, diff, stat);
 	const scope = determineScope(entries);
-	const summary = extractSubject(type, entries, diff);
+	const summary = extractSubject(type, entries, diff, isJapanese(config));
 	const subject = formatSubject(type, scope, summary);
 	const body = wrapText(generateBody(entries, stat, config, type), 72);
 	const breakingFooter = detectBreakingChange(entries, diff);

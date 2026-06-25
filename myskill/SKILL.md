@@ -13,7 +13,7 @@ Read `.pi-git/config.toml` from the project root to determine the language of th
 
 ```toml
 ; Example configuration
-lang = "ja"   ; Body language (default: English)
+lang = "ja"   ; Commit message language — subject and body (default: English)
 ```
 
 Rules based on the `lang` key:
