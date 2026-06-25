@@ -13,6 +13,7 @@ A [pi-coding-agent](https://github.com/earendil-works/pi-coding-agent) extension
 - **Heuristic fallback** – When the LLM is unavailable, generates a commit message from diff analysis
 - **Language support** – Commit message (subject and body) can be written in English or Japanese (configured via `.pi-git/config.toml`)
 - **Interactive confirmation** – Review, edit, or cancel the proposed commit message before executing
+- **Auto-commit on every turn** – Automatically commit changes at the end of each agent turn when `commit_every_turn = true` is set in config
 - **Merge conflict detection** – Refuses to commit when a merge is in progress
 
 ## Installation
@@ -60,12 +61,28 @@ Skips AI generation and commits directly with the provided message.
 
 ### Configuration
 
-Create `.pi-git/config.toml` in your project root to set the commit body language:
+Create `.pi-git/config.toml` in your project root:
 
 ```toml
 # .pi-git/config.toml
-lang = "ja"   # Commit message in Japanese (default: "en" — English)
+lang = "ja"              # Commit message language: "ja" (Japanese) or "en" (English, default)
+no_body = true           # Omit body, subject-only commit message (default: false)
+commit_every_turn = true # Auto-commit at the end of every agent turn (default: false)
 ```
+
+#### `commit_every_turn`
+
+When enabled, the extension listens for the `agent_end` event and automatically:
+1. Checks for uncommitted changes
+2. Stages all files (`git add -A`)
+3. Generates a Conventional Commits message via LLM
+4. Executes the commit
+
+This runs silently in the background — notifications appear in the UI for progress
+and errors, but no interactive confirmation is required.
+
+The feature is safe to enable alongside manual `/commit` usage; it only commits
+when there are actual changes.
 
 ## Commit Message Convention
 
