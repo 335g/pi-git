@@ -188,4 +188,69 @@ export default function (pi: ExtensionAPI) {
 			}
 		},
 	});
+
+	// ── Auto-commit on agent_end (commit_every_turn) ─────────────────
+	pi.on("agent_end", async (_event, ctx) => {
+		const config = loadConfig(ctx.cwd);
+		if (!config.commitEveryTurn) return;
+
+		const git = new GitOperations(pi);
+
+		try {
+			// Check git repo
+			if (!(await git.isInsideGitRepo())) {
+				ctx.ui.notify("commit_every_turn: not a git repository", "warning");
+				return;
+			}
+
+			// Check for merge conflict
+			if (await git.hasMergeConflict()) {
+				ctx.ui.notify(
+					"commit_every_turn: merge conflict in progress, skipping",
+					"warning",
+				);
+				return;
+			}
+
+			// Check for changes
+			const status = await git.checkStatus();
+			if (!status.hasChanges) return;
+
+			// Stage all
+			await git.stageAll();
+
+			// Analyze changes
+			const nameStatus = await git.getStagedNameStatus();
+			const stat = await git.getStagedStat();
+			const diff = await git.getStagedDiff();
+
+			// Generate commit message via LLM
+			ctx.ui.notify("commit_every_turn: generating commit message...", "info");
+			const fullMessage = await generateCommitMessageWithLLM(
+				pi,
+				ctx,
+				nameStatus,
+				stat,
+				diff,
+				config,
+			);
+
+			// Execute commit
+			const result = await git.commit(fullMessage);
+			if (result.code === 0) {
+				ctx.ui.notify(
+					`commit_every_turn: committed - ${fullMessage.split("\n")[0]}`,
+					"info",
+				);
+			} else {
+				ctx.ui.notify(
+					`commit_every_turn: commit failed (code ${result.code}):\n${result.stderr.trim() || "Unknown error"}`,
+					"error",
+				);
+			}
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			ctx.ui.notify(`commit_every_turn: error — ${message}`, "error");
+		}
+	});
 }

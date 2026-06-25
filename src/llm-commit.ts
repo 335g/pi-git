@@ -1,4 +1,4 @@
-import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { PiGitConfig } from "./config.js";
 import { hasNoBody, isJapanese } from "./config.js";
 import { generateCommitMessage, formatFullMessage } from "./commit-message.js";
@@ -14,7 +14,7 @@ import { generateCommitMessage, formatFullMessage } from "./commit-message.js";
  */
 export async function generateCommitMessageWithLLM(
 	pi: ExtensionAPI,
-	ctx: ExtensionCommandContext,
+	ctx: ExtensionContext,
 	nameStatus: string,
 	stat: string,
 	diff: string,

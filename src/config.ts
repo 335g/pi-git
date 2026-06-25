@@ -10,9 +10,11 @@ export interface PiGitConfig {
 	lang: string;
 	/** When `true`, the commit message is generated without a body (subject-only). */
 	noBody?: boolean;
+	/** When `true`, automatically commit at every `agent_end` event. */
+	commitEveryTurn?: boolean;
 }
 
-const DEFAULT_CONFIG: PiGitConfig = { lang: "en", noBody: false };
+const DEFAULT_CONFIG: PiGitConfig = { lang: "en", noBody: false, commitEveryTurn: false };
 
 /**
  * Load `.pi-git/config.toml` from the project root.
@@ -23,7 +25,11 @@ export function loadConfig(cwd: string): PiGitConfig {
 	try {
 		const configPath = join(cwd, ".pi-git", "config.toml");
 		const raw = readFileSync(configPath, "utf-8");
-		const parsed = parse(raw) as { lang?: string; no_body?: boolean };
+		const parsed = parse(raw) as {
+			lang?: string;
+			no_body?: boolean;
+			commit_every_turn?: boolean;
+		};
 
 		const lang = typeof parsed.lang === "string" && parsed.lang.trim().length > 0
 			? parsed.lang.trim()
@@ -33,7 +39,11 @@ export function loadConfig(cwd: string): PiGitConfig {
 			? parsed.no_body
 			: DEFAULT_CONFIG.noBody;
 
-		return { lang, noBody };
+		const commitEveryTurn = typeof parsed.commit_every_turn === "boolean"
+			? parsed.commit_every_turn
+			: DEFAULT_CONFIG.commitEveryTurn;
+
+		return { lang, noBody, commitEveryTurn };
 	} catch {
 		return { ...DEFAULT_CONFIG };
 	}
