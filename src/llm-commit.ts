@@ -33,7 +33,7 @@ export async function generateCommitMessageWithLLM(
 
 	const subjectLangInstruction =
 		lang === "ja"
-			? "Japanese (日本語), imperative plain form (連用形), lowercase (ひらがな優先), no period, 50 chars or fewer."
+			? "Write the subject in Japanese (日本語). No period, 50 chars or fewer."
 			: "English, imperative present tense, lowercase, no period, 50 chars or fewer.";
 
 	const rules = [
