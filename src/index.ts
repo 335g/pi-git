@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { loadConfig } from "./config.js";
 import { GitOperations } from "./git-operations.js";
 import { generateCommitMessageWithLLM } from "./llm-commit.js";
@@ -15,6 +15,28 @@ import { generateCommitMessageWithLLM } from "./llm-commit.js";
  * Mirrors the workflow defined in `myskill/SKILL.md`.
  */
 export default function (pi: ExtensionAPI) {
+	/**
+	 * Update the footer status to show whether there are uncommitted changes.
+	 * Shows "[has changes]" in the footer when changes exist, clears it otherwise.
+	 */
+	async function updateFooterStatus(ctx: ExtensionContext) {
+		const git = new GitOperations(pi);
+		try {
+			if (!(await git.isInsideGitRepo())) {
+				ctx.ui.setStatus("pi-git-uncommitted", undefined);
+				return;
+			}
+			const hasChanges = await git.checkUncommittedChanges();
+			if (hasChanges) {
+				ctx.ui.setStatus("pi-git-uncommitted", "[has changes]");
+			} else {
+				ctx.ui.setStatus("pi-git-uncommitted", undefined);
+			}
+		} catch {
+			ctx.ui.setStatus("pi-git-uncommitted", undefined);
+		}
+	}
+
 	pi.registerCommand("commit", {
 		description: "Stage all changes and generate a Conventional Commits message",
 		handler: async (args, ctx) => {
@@ -46,6 +68,7 @@ export default function (pi: ExtensionAPI) {
 			const status = await git.checkStatus();
 			if (!status.hasChanges) {
 				ctx.ui.notify("No changes to commit", "info");
+				await updateFooterStatus(ctx);
 				return;
 			}
 
@@ -65,6 +88,7 @@ export default function (pi: ExtensionAPI) {
 							`[DRY RUN] Would commit with the following message:\n\n${inlineMessage}`,
 							"info",
 						);
+						await updateFooterStatus(ctx);
 						return;
 					}
 					ctx.ui.notify(`Committing with provided message...`, "info");
@@ -74,6 +98,7 @@ export default function (pi: ExtensionAPI) {
 							`Committed successfully:\n${result.stdout.trim() || inlineMessage.split("\n")[0]}`,
 							"info",
 						);
+						await updateFooterStatus(ctx);
 					} else {
 						ctx.ui.notify(
 							`Commit failed (code ${result.code}):\n${result.stderr.trim() || "Unknown error"}`,
@@ -183,6 +208,7 @@ export default function (pi: ExtensionAPI) {
 
 			if (cancelled) {
 				ctx.ui.notify("Commit cancelled.", "info");
+				await updateFooterStatus(ctx);
 				return;
 			}
 
@@ -192,6 +218,7 @@ export default function (pi: ExtensionAPI) {
 					`[DRY RUN] Skipped. Would commit with:\n\n${fullMessage}`,
 					"info",
 				);
+				await updateFooterStatus(ctx);
 				return;
 			}
 
@@ -202,6 +229,7 @@ export default function (pi: ExtensionAPI) {
 						`Committed successfully:\n${result.stdout.trim() || fullMessage.split("\n")[0]}`,
 						"info",
 					);
+					await updateFooterStatus(ctx);
 				} else {
 					ctx.ui.notify(
 						`Commit failed (code ${result.code}):\n${result.stderr.trim() || "Unknown error"}`,
@@ -215,10 +243,20 @@ export default function (pi: ExtensionAPI) {
 		},
 	});
 
+	// ── Show uncommitted changes indicator in footer ────────────────
+	pi.on("session_start", async (_event, ctx) => {
+		await updateFooterStatus(ctx);
+	});
+
 	// ── Auto-commit on agent_end (commit_every_turn) ─────────────────
 	pi.on("agent_end", async (_event, ctx) => {
 		const config = loadConfig(ctx.cwd);
-		if (!config.commitEveryTurn) return;
+
+		// Update footer regardless of commit_every_turn setting
+		if (!config.commitEveryTurn) {
+			await updateFooterStatus(ctx);
+			return;
+		}
 
 		const git = new GitOperations(pi);
 
@@ -277,6 +315,8 @@ export default function (pi: ExtensionAPI) {
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			ctx.ui.notify(`commit_every_turn: error — ${message}`, "error");
+		} finally {
+			await updateFooterStatus(ctx);
 		}
 	});
 }

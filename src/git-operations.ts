@@ -84,4 +84,14 @@ export class GitOperations {
 	async commit(message: string): Promise<ExecResult> {
 		return await this.pi.exec("git", ["commit", "-m", message]);
 	}
+
+	/**
+	 * Check whether there are any uncommitted changes (staged, unstaged, or untracked).
+	 * Uses `git status --porcelain` for machine-parseable output.
+	 * Returns true if there are any changes relative to HEAD.
+	 */
+	async checkUncommittedChanges(): Promise<boolean> {
+		const { stdout } = await this.pi.exec("git", ["status", "--porcelain"]);
+		return stdout.trim().length > 0;
+	}
 }
