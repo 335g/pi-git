@@ -1,7 +1,0 @@
-[[language]]
-name = "typescript"
-formatter = { "command" = "biome", args = ["format", "--write", "--stdin-file-path", "dummy.ts"] }
-auto-format = true
-file-types = ["ts"]
-roots = ["package.json", "package-lock.json"]
-
