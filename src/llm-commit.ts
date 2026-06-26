@@ -119,7 +119,13 @@ export async function generateCommitMessageWithLLM(
 			.join("\n")
 			.trim();
 
-		if (text) return cleanupResponse(text);
+		if (text) {
+			const cleaned = cleanupResponse(text);
+			if (noBody) {
+				return enforceNoBody(cleaned);
+			}
+			return cleaned;
+		}
 	} catch {
 		// LLM path failed — fall through to heuristic
 	}
@@ -127,6 +133,27 @@ export async function generateCommitMessageWithLLM(
 	// Fallback: heuristic generation
 	const fallback = generateCommitMessage(nameStatus, stat, diff, config);
 	return formatFullMessage(fallback);
+}
+
+/**
+ * Enforce no-body mode: keep only the subject line.
+ *
+ * LLMs may still output a body despite the "NONE" instruction,
+ * so this post-processing guarantees subject-only output.
+ * Also preserves an optional BREAKING CHANGE footer.
+ */
+function enforceNoBody(text: string): string {
+	const lines = text.split("\n");
+	const subject = lines[0];
+	// Preserve BREAKING CHANGE footer even in no-body mode
+	const footerLines = lines.filter((l) =>
+		/^BREAKING\s+CHANGE:/i.test(l.trim()),
+	);
+	const footer =
+		footerLines.length > 0
+			? "\n\n" + footerLines.join("\n")
+			: "";
+	return subject + footer;
 }
 
 /**
