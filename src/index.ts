@@ -2,6 +2,8 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { loadConfig } from "./config.js";
 import { GitOperations } from "./git-operations.js";
 import { generateCommitMessageWithLLM } from "./llm-commit.js";
+import { selectFiles } from "./file-selector.js";
+import { parseNameStatus } from "./commit-message.js";
 
 /**
  * pi-git extension — `/commit` command
@@ -78,7 +80,30 @@ export default function (pi: ExtensionAPI) {
 			// ── 4. Stage all files ──────────────────────────────────────
 			await git.stageAll();
 
-			// ── 5. Check if user provided an inline commit message ──────
+			// ── 5. File selection ───────────────────────────────────────
+			// Show the staged file list and let the user pick which files
+			// to include in this commit. Only shown for interactive commits,
+			// not for auto-commit (commit_every_turn).
+			const nameStatusBeforeSelect = await git.getStagedNameStatus();
+			const selectedFiles = await selectFiles(ctx, nameStatusBeforeSelect);
+
+			if (selectedFiles === null) {
+				// User cancelled – unstage everything and stop
+				await git.unstageAll();
+				ctx.ui.notify("Commit cancelled (no files selected).", "info");
+				await updateFooterStatus(ctx);
+				return;
+			}
+
+			// Unstage files that were NOT selected by the user
+			const allParsed = parseNameStatus(nameStatusBeforeSelect);
+			for (const entry of allParsed) {
+				if (!selectedFiles.includes(entry.path)) {
+					await git.unstageFile(entry.path);
+				}
+			}
+
+			// ── 6. Check if user provided an inline commit message ──────
 			// If inlineMessage has text, use it directly without AI generation.
 			if (inlineMessage) {
 				// Skip AI generation — commit directly with the provided message
@@ -112,17 +137,17 @@ export default function (pi: ExtensionAPI) {
 				return;
 			}
 
-			// ── 6. Analyze changes ──────────────────────────────────────
+			// ── 7. Analyze changes ──────────────────────────────────────
 			const nameStatus = await git.getStagedNameStatus();
 			const stat = await git.getStagedStat();
 			const diff = await git.getStagedDiff();
 
-			// ── 7. Notify dry-run mode ─────────────────────────────────
+			// ── 8. Notify dry-run mode ─────────────────────────────────
 			if (dryRun) {
 				ctx.ui.notify("[DRY RUN] Commit will be simulated — no changes will be committed.", "info");
 			}
 
-			// ── 8. Generate commit message via LLM ─────────────────────
+			// ── 9. Generate commit message via LLM ─────────────────────
 			// Uses pi's model (same as the current session), with heuristic
 			// fallback when the LLM is unavailable.
 			ctx.ui.notify("Generating commit message via LLM...", "info");
@@ -135,7 +160,7 @@ export default function (pi: ExtensionAPI) {
 				config,
 			);
 
-			// ── 9. User confirmation loop ───────────────────────────────
+			// ── 10. User confirmation loop ──────────────────────────────
 			let confirmed = false;
 			let cancelled = false;
 
@@ -212,7 +237,7 @@ export default function (pi: ExtensionAPI) {
 				return;
 			}
 
-			// ── 10. Execute commit ──────────────────────────────────────
+			// ── 11. Execute commit ──────────────────────────────────────
 			if (dryRun) {
 				ctx.ui.notify(
 					`[DRY RUN] Skipped. Would commit with:\n\n${fullMessage}`,

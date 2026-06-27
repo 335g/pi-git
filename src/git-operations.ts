@@ -86,6 +86,20 @@ export class GitOperations {
 	}
 
 	/**
+	 * Unstage a specific file (`git restore --staged -- <file>`).
+	 */
+	async unstageFile(file: string): Promise<void> {
+		await this.pi.exec("git", ["restore", "--staged", "--", file]);
+	}
+
+	/**
+	 * Unstage all changes (`git reset HEAD --`).
+	 */
+	async unstageAll(): Promise<void> {
+		await this.pi.exec("git", ["reset", "HEAD", "--"]);
+	}
+
+	/**
 	 * Check whether there are any uncommitted changes (staged, unstaged, or untracked).
 	 * Uses `git status --porcelain` for machine-parseable output.
 	 * Returns true if there are any changes relative to HEAD.
