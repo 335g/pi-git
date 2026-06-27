@@ -4,7 +4,7 @@ import { GitOperations } from "./git-operations.js";
 import { generateCommitMessageWithLLM } from "./llm-commit.js";
 import { selectFiles, type FileDetail } from "./file-selector.js";
 import { parseNameStatus } from "./commit-message.js";
-import { runCritReview, type CritReviewResult } from "./reviewer.js";
+import { checkCritAvailable, runCritReview, type CritReviewResult } from "./reviewer.js";
 
 /**
  * pi-git extension — `/commit` command
@@ -332,6 +332,16 @@ export default function (pi: ExtensionAPI) {
 
 			// ── 3. Load config ──────────────────────────────────────────
 			const config = loadConfig(ctx.cwd);
+
+			// ── 3.5. Check crit availability ────────────────────────────
+			try {
+				await checkCritAvailable(pi);
+			} catch (err) {
+				const message =
+					err instanceof Error ? err.message : String(err);
+				ctx.ui.notify(message, "error");
+				return;
+			}
 
 			// ── 4. Stage all files ──────────────────────────────────────
 			await git.stageAll();

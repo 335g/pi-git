@@ -31,6 +31,24 @@ export interface CritReviewResult {
 }
 
 /**
+ * Check whether the `crit` CLI is available on the system.
+ *
+ * Should be called early in the review command handler, before any git state
+ * is modified, so the user gets a clear message if crit is not installed.
+ *
+ * @throws If `crit` is not found on the system PATH.
+ */
+export async function checkCritAvailable(pi: ExtensionAPI): Promise<void> {
+	try {
+		await pi.exec("which", ["crit"]);
+	} catch {
+		throw new Error(
+			"`crit` is not available. Install it first (npm install -g crit) or use `/commit` instead.",
+		);
+	}
+}
+
+/**
  * Write a review document and launch crit on it.
  *
  * Creates a temporary markdown file with the diff summary, opens crit in the
