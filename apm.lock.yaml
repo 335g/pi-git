@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-06-27T15:06:09.603290+00:00'
+generated_at: '2026-06-27T16:26:33.086491+00:00'
 apm_version: 0.21.0
 dependencies:
 - repo_url: mattpocock/skills
@@ -7,6 +7,8 @@ dependencies:
   resolved_commit: 8370e760d0251a3738e006aeacec6d1cb31dd208
   package_type: marketplace_plugin
   deployed_files:
+  - .agents/skills/ask-matt
+  - .agents/skills/ask-matt/SKILL.md
   - .agents/skills/domain-modeling
   - .agents/skills/domain-modeling/ADR-FORMAT.md
   - .agents/skills/domain-modeling/CONTEXT-FORMAT.md
@@ -17,6 +19,9 @@ dependencies:
   - .agents/skills/grill-with-docs/SKILL.md
   - .agents/skills/grilling
   - .agents/skills/grilling/SKILL.md
+  - .agents/skills/improve-codebase-architecture
+  - .agents/skills/improve-codebase-architecture/HTML-REPORT.md
+  - .agents/skills/improve-codebase-architecture/SKILL.md
   - .agents/skills/setup-matt-pocock-skills
   - .agents/skills/setup-matt-pocock-skills/SKILL.md
   - .agents/skills/setup-matt-pocock-skills/domain.md
@@ -27,12 +32,15 @@ dependencies:
   - .agents/skills/to-prd
   - .agents/skills/to-prd/SKILL.md
   deployed_file_hashes:
+    .agents/skills/ask-matt/SKILL.md: sha256:fb534e029b0b4a27188f62e3839ab027c69e025915229c4524693eb1edcbb64d
     .agents/skills/domain-modeling/ADR-FORMAT.md: sha256:f1f36cd3f8d3b6474ddd5855da4e233bfc4ae1a1c5024909ccf11871819a41b2
     .agents/skills/domain-modeling/CONTEXT-FORMAT.md: sha256:b8cc318f2a4285b530e908b6bc43901c3c5cd11100362636bbc4216639bef597
     .agents/skills/domain-modeling/SKILL.md: sha256:152e2c97239affb12a60c5f4a7e74ab546a49ae169688c81f4e2ccc42dafa579
     .agents/skills/grill-me/SKILL.md: sha256:6189dfceb7304a6e5558f75d87e68fa3bc7fcf7ba120e44f21f8a61fe01eba54
     .agents/skills/grill-with-docs/SKILL.md: sha256:610d091047bcfb9db0f75c057d15538481a721111579fc5ec7f83ad9131a2165
     .agents/skills/grilling/SKILL.md: sha256:fe00af3e1815f97c0a7644605479328a726b5cd95ba6ef56a4be2a92fae6c20f
+    .agents/skills/improve-codebase-architecture/HTML-REPORT.md: sha256:0b0936104158abeef7246ff6cbabefa4dc055f17589f2833f2d93001421910a1
+    .agents/skills/improve-codebase-architecture/SKILL.md: sha256:0026900866ed2a542af0559cef11dd7ae707633b75cc6f668c2e7c0a33e35032
     .agents/skills/setup-matt-pocock-skills/SKILL.md: sha256:a85441f31decd5705ade6b526206d60be129dbe926251c67213fe1649da5f197
     .agents/skills/setup-matt-pocock-skills/domain.md: sha256:25be404b58798b3cb2d51c93dba2ab052fc3a425632185726ac3f5fcff193b99
     .agents/skills/setup-matt-pocock-skills/issue-tracker-github.md: sha256:1e7ac76d3dd7f0ce41d6bf86912619a4bac164a70c6e246ae48f6825e222d56d
@@ -42,9 +50,12 @@ dependencies:
     .agents/skills/to-prd/SKILL.md: sha256:db7e7188ac4fd47f4925ae6550e0233365b3b05be40f45235ab3a0a6b0165156
   content_hash: sha256:74b35ab07a5b9a42c9561f4a70d44ba2c5b65c5ae8553ca908c081da658df69c
   skill_subset:
+  - ask-matt
   - domain-modeling
   - grill-me
   - grill-with-docs
   - grilling
+  - implement
+  - improve-codebase-architecture
   - setup-matt-pocock-skills
   - to-prd
