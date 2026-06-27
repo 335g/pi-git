@@ -1,5 +1,5 @@
 lockfile_version: '1'
-generated_at: '2026-06-27T15:04:58.287391+00:00'
+generated_at: '2026-06-27T15:06:09.603290+00:00'
 apm_version: 0.21.0
 dependencies:
 - repo_url: mattpocock/skills
@@ -17,6 +17,13 @@ dependencies:
   - .agents/skills/grill-with-docs/SKILL.md
   - .agents/skills/grilling
   - .agents/skills/grilling/SKILL.md
+  - .agents/skills/setup-matt-pocock-skills
+  - .agents/skills/setup-matt-pocock-skills/SKILL.md
+  - .agents/skills/setup-matt-pocock-skills/domain.md
+  - .agents/skills/setup-matt-pocock-skills/issue-tracker-github.md
+  - .agents/skills/setup-matt-pocock-skills/issue-tracker-gitlab.md
+  - .agents/skills/setup-matt-pocock-skills/issue-tracker-local.md
+  - .agents/skills/setup-matt-pocock-skills/triage-labels.md
   - .agents/skills/to-prd
   - .agents/skills/to-prd/SKILL.md
   deployed_file_hashes:
@@ -26,6 +33,12 @@ dependencies:
     .agents/skills/grill-me/SKILL.md: sha256:6189dfceb7304a6e5558f75d87e68fa3bc7fcf7ba120e44f21f8a61fe01eba54
     .agents/skills/grill-with-docs/SKILL.md: sha256:610d091047bcfb9db0f75c057d15538481a721111579fc5ec7f83ad9131a2165
     .agents/skills/grilling/SKILL.md: sha256:fe00af3e1815f97c0a7644605479328a726b5cd95ba6ef56a4be2a92fae6c20f
+    .agents/skills/setup-matt-pocock-skills/SKILL.md: sha256:a85441f31decd5705ade6b526206d60be129dbe926251c67213fe1649da5f197
+    .agents/skills/setup-matt-pocock-skills/domain.md: sha256:25be404b58798b3cb2d51c93dba2ab052fc3a425632185726ac3f5fcff193b99
+    .agents/skills/setup-matt-pocock-skills/issue-tracker-github.md: sha256:1e7ac76d3dd7f0ce41d6bf86912619a4bac164a70c6e246ae48f6825e222d56d
+    .agents/skills/setup-matt-pocock-skills/issue-tracker-gitlab.md: sha256:6282954685bf55b7da7fad9f45dc4226d39e498ebaee1e06372708033fa40a09
+    .agents/skills/setup-matt-pocock-skills/issue-tracker-local.md: sha256:9a052f4599525e581721ec24cb2ae3e0296b79053e39f684b540d34d3a4f6528
+    .agents/skills/setup-matt-pocock-skills/triage-labels.md: sha256:4f53c9b40ce2651e3611aa090eaedbd6dbc9b71ef8c5f7e65eac0d8263190d0d
     .agents/skills/to-prd/SKILL.md: sha256:db7e7188ac4fd47f4925ae6550e0233365b3b05be40f45235ab3a0a6b0165156
   content_hash: sha256:74b35ab07a5b9a42c9561f4a70d44ba2c5b65c5ae8553ca908c081da658df69c
   skill_subset:
@@ -33,4 +46,5 @@ dependencies:
   - grill-me
   - grill-with-docs
   - grilling
+  - setup-matt-pocock-skills
   - to-prd

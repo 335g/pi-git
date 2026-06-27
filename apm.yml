@@ -8,6 +8,7 @@ dependencies:
   apm:
   - git: mattpocock/skills
     skills:
+    - setup-matt-pocock-skills
     - domain-modeling
     - grill-me
     - grilling
