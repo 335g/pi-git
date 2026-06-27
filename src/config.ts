@@ -2,6 +2,9 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parse } from "smol-toml";
 
+// Known TOML keys (snake_case as they appear in the file)
+const KNOWN_KEYS = new Set(["lang", "no_body", "commit_every_turn"]);
+
 /**
  * Language configuration for commit messages.
  */
@@ -25,11 +28,16 @@ export function loadConfig(cwd: string): PiGitConfig {
 	try {
 		const configPath = join(cwd, ".pi-git", "config.toml");
 		const raw = readFileSync(configPath, "utf-8");
-		const parsed = parse(raw) as {
-			lang?: string;
-			no_body?: boolean;
-			commit_every_turn?: boolean;
-		};
+		const parsed = parse(raw) as Record<string, unknown>;
+
+		// Warn about unknown (possibly misspelled) keys
+		const unknownKeys = Object.keys(parsed).filter((k) => !KNOWN_KEYS.has(k));
+		if (unknownKeys.length > 0) {
+			console.warn(
+				`[pi-git] Unknown config key(s): ${unknownKeys.join(", ")}. ` +
+					`Valid keys: ${[...KNOWN_KEYS].join(", ")}`,
+			);
+		}
 
 		const lang = typeof parsed.lang === "string" && parsed.lang.trim().length > 0
 			? parsed.lang.trim()
