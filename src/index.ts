@@ -7,7 +7,7 @@ import { GitOperations } from "./git-operations.js";
 import { checkCritAvailable, runCritReview } from "./reviewer.js";
 
 /**
- * pi-git extension — `/commit` and `/review` commands
+ * pi-git extension — `/git-commit` and `/git-review` commands
  *
  * Stages all current files, generates a Conventional Commits message,
  * and commits. The heavy lifting is delegated to `runCommitPipeline`
@@ -36,10 +36,10 @@ export default function (pi: ExtensionAPI) {
 	}
 
 	// ───────────────────────────────────────────────────────
-	// /commit command
+	// /git-commit command
 	// ───────────────────────────────────────────────────────
 
-	pi.registerCommand("commit", {
+	pi.registerCommand("git-commit", {
 		description: "Stage all changes and generate a Conventional Commits message",
 		handler: async (args, ctx) => {
 			const { dryRun, inlineMessage } = parseCommitArgs(args?.trim() ?? "");
@@ -60,16 +60,16 @@ export default function (pi: ExtensionAPI) {
 			} catch (error) {
 				const message =
 					error instanceof Error ? error.message : String(error);
-				ctx.ui.notify(`Commit error: ${message}`, "error");
+				ctx.ui.notify(`git-commit error: ${message}`, "error");
 			}
 		},
 	});
 
 	// ───────────────────────────────────────────────────────
-	// /review command
+	// /git-review command
 	// ───────────────────────────────────────────────────────
 
-	pi.registerCommand("review", {
+	pi.registerCommand("git-review", {
 		description:
 			"Stage, review with crit, generate commit message, and commit",
 		handler: async (args, ctx) => {
@@ -175,7 +175,7 @@ export default function (pi: ExtensionAPI) {
 				if (message.includes("cancelled")) {
 					ctx.ui.notify(message, "info");
 				} else {
-					ctx.ui.notify(`Review error: ${message}`, "error");
+					ctx.ui.notify(`git-review error: ${message}`, "error");
 				}
 			}
 		},

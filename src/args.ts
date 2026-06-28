@@ -1,7 +1,7 @@
 /**
  * Commit command argument parsing.
  *
- * Parses raw argument string from `/commit` and `/review` commands.
+ * Parses raw argument string from `/git-commit` and `/git-review` commands.
  * Pure function — no side effects, easily testable.
  */
 
@@ -17,7 +17,7 @@ export interface ParsedCommitArgs {
 }
 
 /**
- * Parse raw argument string from `/commit` or `/review`.
+ * Parse raw argument string from `/git-commit` or `/git-review`.
  *
  * Rules:
  * - `--dry-run` anywhere in the string sets `dryRun: true` and is removed from the inline message

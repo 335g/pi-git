@@ -3,13 +3,13 @@
 [![npm version](https://img.shields.io/npm/v/@335g/pi-git.svg)](https://www.npmjs.com/package/@335g/pi-git)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A [pi-coding-agent](https://github.com/earendil-works/pi-coding-agent) extension that adds `/commit` and `/review` commands for generating [Conventional Commits](https://www.conventionalcommits.org/) messages using LLM or heuristic fallback.
+A [pi-coding-agent](https://github.com/earendil-works/pi-coding-agent) extension that adds `/git-commit` and `/git-review` commands for generating [Conventional Commits](https://www.conventionalcommits.org/) messages using LLM or heuristic fallback.
 
 ## Features
 
-- **`/commit` command** – Stage all changes, optionally select files, and commit with an AI-generated message
-- **`/review` command** – Stage, review changes with [crit](https://github.com/335g/crit) inline comments, then generate a commit message
-- **Inline message support** – `/commit fix typo` uses the message directly without AI generation
+- **`/git-commit` command** – Stage all changes, optionally select files, and commit with an AI-generated message
+- **`/git-review` command** – Stage, review changes with [crit](https://github.com/335g/crit) inline comments, then generate a commit message
+- **Inline message support** – `/git-commit fix typo` uses the message directly without AI generation
 - **AI-powered generation** – Leverages pi's LLM to produce Conventional Commits messages from staged diffs
 - **Heuristic fallback** – When the LLM is unavailable, generates a commit message from diff analysis
 - **Interactive file selection** – Pick which staged files to include; preview diffs with QuickLook-style overlay (TUI mode)
@@ -42,7 +42,7 @@ Or add it to your pi package config:
 In a pi session, inside a git repository:
 
 ```
-/commit
+/git-commit
 ```
 
 This will:
@@ -57,7 +57,7 @@ This will:
 ### Inline commit message
 
 ```
-/commit fix typo in header
+/git-commit fix typo in header
 ```
 
 Skips AI generation and commits directly with the provided message. File selection still runs (TUI mode).
@@ -67,10 +67,10 @@ Skips AI generation and commits directly with the provided message. File selecti
 Requires [crit](https://github.com/335g/crit) to be installed (`npm install -g crit`).
 
 ```
-/review
+/git-review
 ```
 
-Same flow as `/commit`, but after staging and file selection:
+Same flow as `/git-commit`, but after staging and file selection:
 1. Opens a crit review in your browser for inline comments on the diff
 2. After finishing the review, unresolved comments are shown
 3. Choose whether to include comments in the commit message context
@@ -82,15 +82,15 @@ Same flow as `/commit`, but after staging and file selection:
 Preview without committing:
 
 ```
-/commit --dry-run
-/review --dry-run
+/git-commit --dry-run
+/git-review --dry-run
 ```
 
 The full pipeline (stage, file selection, LLM generation, confirmation) runs, but the actual `git commit` is skipped. No files are unstaged.
 
 ### Interactive file selection (TUI mode)
 
-When running `/commit` or `/review` in TUI mode, an interactive file picker appears:
+When running `/git-commit` or `/git-review` in TUI mode, an interactive file picker appears:
 
 ```
  Select files to commit  (3/5)
@@ -132,7 +132,7 @@ When enabled, the extension listens for the `agent_end` event and automatically:
 This runs silently in the background — notifications appear in the UI for progress
 and errors, but no interactive confirmation is required.
 
-The feature is safe to enable alongside manual `/commit` usage; it only commits
+The feature is safe to enable alongside manual `/git-commit` usage; it only commits
 when there are actual changes.
 
 ## Commit Message Convention
@@ -178,7 +178,7 @@ npm test
 - [pi-coding-agent](https://github.com/earendil-works/pi-coding-agent) (peer dependency)
 - [pi-ai](https://github.com/earendil-works/pi-ai) (peer dependency)
 - [pi-tui](https://github.com/earendil-works/pi-tui) (optional peer dependency – enables interactive file selection and confirmation UI)
-- [crit](https://github.com/335g/crit) (optional – required for `/review` command)
+- [crit](https://github.com/335g/crit) (optional – required for `/git-review` command)
 
 ## License
 
