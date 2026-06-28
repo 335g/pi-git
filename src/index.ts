@@ -1,4 +1,5 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { matchesKey, Key, truncateToWidth } from "@earendil-works/pi-tui";
 import { loadConfig } from "./config.js";
 import { runCommitPipeline } from "./pipeline.js";
 import { parseCommitArgs } from "./args.js";
@@ -7,11 +8,15 @@ import { GitOperations } from "./git-operations.js";
 import { checkCritAvailable, runCritReview } from "./reviewer.js";
 
 /**
- * pi-git extension — `/git-commit` and `/git-review` commands
+ * pi-git extension — `/git-commit`, `/git-review`, and `/git-status` commands
  *
- * Stages all current files, generates a Conventional Commits message,
- * and commits. The heavy lifting is delegated to `runCommitPipeline`
- * in `pipeline.ts`; this module only registers commands and events.
+ * `/git-commit` stages all current files, generates a Conventional Commits
+ * message, and commits.
+ * `/git-review` does the same with a crit review step before committing.
+ * `/git-status` shows the working tree status in a scrollable TUI viewer.
+ *
+ * The heavy lifting is delegated to `runCommitPipeline` in `pipeline.ts`;
+ * this module only registers commands and events.
  */
 export default function (pi: ExtensionAPI) {
 	/**
@@ -61,6 +66,34 @@ export default function (pi: ExtensionAPI) {
 				const message =
 					error instanceof Error ? error.message : String(error);
 				ctx.ui.notify(`git-commit error: ${message}`, "error");
+			}
+		},
+	});
+
+	// ───────────────────────────────────────────────────────
+	// /git-status command
+	// ───────────────────────────────────────────────────────
+
+	pi.registerCommand("git-status", {
+		description: "Show git status (working tree and staged changes)",
+		handler: async (args, ctx) => {
+			const git = new GitOperations(pi);
+			try {
+				if (!(await git.isInsideGitRepo())) {
+					ctx.ui.notify("Not a git repository", "error");
+					return;
+				}
+				const status = await git.getFullStatus();
+
+				if (ctx.mode === "tui") {
+					await showStatusViewer(ctx, status);
+				} else {
+					ctx.ui.notify(status || "No changes", "info");
+				}
+			} catch (error) {
+				const message =
+					error instanceof Error ? error.message : String(error);
+				ctx.ui.notify(`git-status error: ${message}`, "error");
 			}
 		},
 	});
@@ -214,5 +247,148 @@ export default function (pi: ExtensionAPI) {
 				"error",
 			);
 		}
+	});
+}
+
+/**
+ * Show `git status` output in a scrollable full-screen TUI viewer.
+ *
+ * Navigation:
+ *   ↑↓        scroll one line
+ *   pgup/pgdn scroll 20 lines
+ *   esc/^c    close
+ */
+async function showStatusViewer(
+	ctx: ExtensionContext,
+	statusOutput: string,
+): Promise<void> {
+	const lines = statusOutput.split("\n");
+	if (lines.length === 0 || (lines.length === 1 && lines[0] === "")) {
+		ctx.ui.notify("No changes — working tree clean.", "info");
+		return;
+	}
+
+	await ctx.ui.custom<void>((_tui, theme, _kb, done) => {
+		let scrollOffset = 0;
+		const maxVisible = Math.min(lines.length, 40);
+
+		return {
+			invalidate() {
+				// No caching needed.
+			},
+
+			handleInput(data: string) {
+				if (
+					matchesKey(data, Key.escape) ||
+					matchesKey(data, Key.ctrl("c"))
+				) {
+					done(undefined);
+					return;
+				}
+
+				if (matchesKey(data, Key.up)) {
+					if (scrollOffset > 0) {
+						scrollOffset--;
+						_tui.requestRender();
+					}
+				} else if (matchesKey(data, Key.down)) {
+					if (scrollOffset < lines.length - 1) {
+						scrollOffset++;
+						_tui.requestRender();
+					}
+				} else if (
+					matchesKey(data, Key.pageUp) ||
+					matchesKey(data, Key.ctrl("b"))
+				) {
+					scrollOffset = Math.max(0, scrollOffset - 20);
+					_tui.requestRender();
+				} else if (
+					matchesKey(data, Key.pageDown) ||
+					matchesKey(data, Key.ctrl("f"))
+				) {
+					scrollOffset = Math.min(
+						Math.max(0, lines.length - 1),
+						scrollOffset + 20,
+					);
+					_tui.requestRender();
+				}
+			},
+
+			render(width: number): string[] {
+				const result: string[] = [];
+
+				// Title
+				result.push(
+					theme.fg("accent", theme.bold(" git status")),
+				);
+				result.push(
+					theme.fg(
+						"dim",
+						" " + "─".repeat(Math.min(width - 1, 60)),
+					),
+				);
+				result.push("");
+
+				// Content
+				const endLine = Math.min(
+					scrollOffset + maxVisible,
+					lines.length,
+				);
+				const visible = lines.slice(scrollOffset, endLine);
+
+				for (const line of visible) {
+					// Colour-coded lines
+					let styled = line;
+					if (
+						line.startsWith("\tdeleted:")
+					) {
+						styled = theme.fg("error", line);
+					} else if (
+						line.startsWith("\tnew file:") ||
+						line.startsWith("\tcopied:")
+					) {
+						styled = theme.fg("success", line);
+					} else if (
+						line.startsWith("\tmodified:") ||
+						line.startsWith("\trenamed:")
+					) {
+						styled = theme.fg("warning", line);
+					} else if (
+						line.includes("Changes not staged for commit") ||
+						line.includes("Changes to be committed") ||
+						line.includes("Untracked files")
+					) {
+						styled = theme.fg("accent", line);
+					}
+					result.push(truncateToWidth(styled, width));
+				}
+
+				// Scroll indicator
+				if (lines.length > maxVisible) {
+					result.push("");
+					const scrollPercent = Math.round(
+						(scrollOffset /
+							Math.max(1, lines.length - maxVisible)) *
+							100,
+					);
+					const scrollInfo = theme.fg(
+						"dim",
+						`  ${scrollPercent}%  (${scrollOffset + 1}–${endLine}/${lines.length})`,
+					);
+					result.push(scrollInfo);
+				}
+
+				// Help bar
+				result.push("");
+				result.push(
+					theme.fg(
+						"dim",
+						"  esc/^c close  ↑↓ scroll  pgup/pgdn ±20行",
+					),
+				);
+
+				return result;
+			},
+		};
 	});
 }

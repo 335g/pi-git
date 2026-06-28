@@ -137,6 +137,14 @@ export class GitOperations {
 	}
 
 	/**
+	 * Run `git status` (full output, human-readable) and return the result.
+	 */
+	async getFullStatus(): Promise<string> {
+		const { stdout } = await this.pi.exec("git", ["status"]);
+		return stdout;
+	}
+
+	/**
 	 * Check whether there are any uncommitted changes (staged, unstaged, or untracked).
 	 * Uses `git status --porcelain` for machine-parseable output.
 	 * Returns true if there are any changes relative to HEAD.
