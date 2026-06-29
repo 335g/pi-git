@@ -39,7 +39,12 @@ export class GitOperations {
 	 * Stage all changes via `git add -A`.
 	 */
 	async stageAll(): Promise<void> {
-		await this.pi.exec("git", ["add", "-A"]);
+		const result = await this.pi.exec("git", ["add", "-A"]);
+		if (result.code !== 0) {
+			throw new Error(
+				`git add -A failed (code ${result.code}): ${result.stderr.trim() || "Unknown error"}`,
+			);
+		}
 	}
 
 	/**
@@ -87,16 +92,30 @@ export class GitOperations {
 
 	/**
 	 * Unstage a specific file (`git restore --staged -- <file>`).
+	 *
+	 * Throws when the git command fails (non-zero exit), ensuring callers
+	 * (e.g. the commit pipeline) can detect the failure and abort/clean up
+	 * instead of silently committing unselected files.
 	 */
 	async unstageFile(file: string): Promise<void> {
-		await this.pi.exec("git", ["restore", "--staged", "--", file]);
+		const result = await this.pi.exec("git", ["restore", "--staged", "--", file]);
+		if (result.code !== 0) {
+			throw new Error(
+				`git restore --staged -- ${file} failed (code ${result.code}): ${result.stderr.trim() || "Unknown error"}`,
+			);
+		}
 	}
 
 	/**
 	 * Unstage all changes (`git reset HEAD --`).
 	 */
 	async unstageAll(): Promise<void> {
-		await this.pi.exec("git", ["reset", "HEAD", "--"]);
+		const result = await this.pi.exec("git", ["reset", "HEAD", "--"]);
+		if (result.code !== 0) {
+			throw new Error(
+				`git reset HEAD -- failed (code ${result.code}): ${result.stderr.trim() || "Unknown error"}`,
+			);
+		}
 	}
 
 	/**
