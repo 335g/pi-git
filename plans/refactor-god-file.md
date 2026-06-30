@@ -40,7 +40,7 @@ import type { PiGitConfig } from "./config.js";
 import { GitOperations } from "./git-operations.js";
 import { selectFiles, type FileDetail } from "./file-selector.js";
 import { generateCommitMessageWithLLM } from "./llm-commit.js";
-import { parseNameStatus } from "./commit-message.js";
+import { parseNameStatus } from "./git-parser.js";
 import type { MessageAction } from "./confirmation.js";
 
 // ── 型定義 ───────────────────────────────────────────────
@@ -379,7 +379,9 @@ export default function (pi: ExtensionAPI) {
 | **`src/pipeline.ts`** | **新規**: `PipelineContext`, `CommitPipelineHooks`, `CommitPipelineOptions`, `runCommitPipeline` | ~120行 |
 | **`src/confirmation.ts`** | **新規**: `MessageAction`, `confirmCommitMessage` | ~60行 |
 | **`src/args.ts`** | **新規**: `parseCommitArgs`, `ParsedCommitArgs` | ~25行 |
-| `src/commit-message.ts` | （変更なし） |
+| **`src/git-parser.ts`** | **新規**: `ParsedNameStatus`, `parseNameStatus`（`commit-message.ts` から抽出） | ~25行 |
+| **`src/git-parser.test.ts`** | **新規**: `parseNameStatus` の11テストケース | ~110行 |
+| `src/commit-message.ts` | `CommitType`/`determineType`/`determineScope` を internal 化、`parseNameStatus` を `git-parser.ts` に移動 |
 | `src/llm-commit.ts` | （変更なし） |
 | `src/git-operations.ts` | （変更なし） |
 | `src/reviewer.ts` | （変更なし） — `runCritReview` を `PipelineContext.pi` 経由で直接呼ぶ |
